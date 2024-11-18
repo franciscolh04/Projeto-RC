@@ -1,20 +1,25 @@
-# Definir variáveis
 CC = gcc
-CFLAGS = -Wall -g  # Flags de compilação (warnings e depuração)
-SRC_DIR = src/server  # Diretório onde está o código fonte
-OUT_DIR = .  # Diretório de saída (onde o executável será criado)
-OUT_NAME = GS  # Nome do executável
-SRC_FILE = $(SRC_DIR)/GS.c  # Caminho para o ficheiro de código fonte
+CFLAGS = -Wall -g
 
-# Alvo padrão: compilar o programa
-all: $(OUT_NAME)
+# Diretórios
+SERVER_SRC = src/server/GS.c
+PLAYER_SRC = src/client/player.c
 
-# Como compilar o executável
-$(OUT_NAME): $(SRC_FILE)
-	$(CC) $(CFLAGS) $(SRC_FILE) -o $(OUT_NAME)
+# Executáveis
+GS_EXEC = GS
+PLAYER_EXEC = player
 
-# Limpar ficheiros gerados (executáveis, etc.)
+# Regras para compilar
+all: $(GS_EXEC) $(PLAYER_EXEC)
+
+# Compilar o GS
+$(GS_EXEC): $(SERVER_SRC)
+	$(CC) $(CFLAGS) -o $(GS_EXEC) $(SERVER_SRC)
+
+# Compilar o player
+$(PLAYER_EXEC): $(PLAYER_SRC)
+	$(CC) $(CFLAGS) -o $(PLAYER_EXEC) $(PLAYER_SRC)
+
+# Limpeza dos arquivos gerados
 clean:
-	rm -f $(OUT_NAME)
-
-.PHONY: all clean
+	rm -f $(GS_EXEC) $(PLAYER_EXEC)
