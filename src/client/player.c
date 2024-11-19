@@ -55,28 +55,25 @@ int main(int argc, char *argv[]) {
 
     // Loop principal para interações contínuas
     while (1) {
-
-        /*
         printf("Digite uma mensagem para enviar ao servidor (ou 'exit' para sair): ");
         fgets(buffer, BUF_SIZE, stdin);
         buffer[strcspn(buffer, "\n")] = 0;  // Remover a nova linha do final da string
-        */
-
-        /*
+        
+        
         // Se o comando for 'exit', sair do loop
         if (strcmp(buffer, "exit") == 0) {
             printf("Fechando o cliente...\n");
             break;
         }
-        */
-        /*
+    
+        
         if (sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
             perror("Erro ao enviar mensagem para o servidor");
             close(sockfd);
             exit(EXIT_FAILURE);
         }
         printf("Mensagem enviada para o servidor: %s\n", buffer);
-        */
+        
 
         // Comando inserido pelo utilizador
         // Switch para ver que comando é e preparar mensagem a enviar
