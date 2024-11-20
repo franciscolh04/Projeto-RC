@@ -11,6 +11,8 @@
 #define GN 0
 #define BUF_SIZE 1024
 
+int PLID = -1;
+
 // Funções para configurar os sockets
 void setup_udp_socket(int *sockfd, struct sockaddr_in *server_addr, char *server_ip, int port);
 void setup_tcp_socket(int *sockfd, struct sockaddr_in *server_addr, char *server_ip, int port);
@@ -69,10 +71,10 @@ int main(int argc, char *argv[]) {
         // Enviar a mensagem e receber a resposta conforme o protocolo
         if (protocol == 'U') {
             send_udp_message(sock_fd_udp, &server_addr, formatted_command);
-            receive_udp_response(sock_fd_udp, &server_addr);
+            //receive_udp_response(sock_fd_udp, &server_addr);
         } else if (protocol == 'T') {
             send_tcp_message(sock_fd_tcp, formatted_command);
-            receive_tcp_response(sock_fd_tcp);
+            //receive_tcp_response(sock_fd_tcp);
         } else {
             printf("Comando inválido ou protocolo não suportado.\n");
         }
@@ -162,14 +164,39 @@ void receive_tcp_response(int sockfd) {
 
 void process_command(const char *input, char *formatted_command, char *protocol) {
     char command[BUF_SIZE];
-    int plid, max_playtime;
+    int max_playtime;
+    char c1[2], c2[2], c3[2], c4[2];
 
     // Análise do comando e definição do protocolo
-    if (sscanf(input, "start %d %d", &plid, &max_playtime) == 2) {
-        snprintf(formatted_command, BUF_SIZE, "SNG %d %d", plid, max_playtime);
+    if (sscanf(input, "start %d %d", &PLID, &max_playtime) == 2) {
+        snprintf(formatted_command, BUF_SIZE, "SNG %d %d", PLID, max_playtime);
         *protocol = 'U';  // UDP para o comando "start"
     } 
     // Adicionar outras condições conforme os outros comandos
+    else if (sscanf(input, "try %1s %1s %1s %1s", c1, c2, c3, c4) == 4) {
+        snprintf(formatted_command, BUF_SIZE, "TRY %d %s %s %s %s", PLID, c1, c2, c3, c4);
+        *protocol = 'U';  // UDP para o comando "try"
+    }
+    else if (strcmp(input, "show_trials") == 0 || strcmp(input, "st") == 0) {
+        snprintf(formatted_command, BUF_SIZE, "STR %d", PLID);
+        *protocol = 'T';  // TCP para o comando "show_trials"
+    }
+    else if (strcmp(input, "scoreboard") == 0 || strcmp(input, "sb") == 0) {
+        snprintf(formatted_command, BUF_SIZE, "SSB");
+        *protocol = 'T';  // TCP para o comando "scoreboard"
+    }
+    else if (strcmp(input, "quit") == 0) {
+        snprintf(formatted_command, BUF_SIZE, "QUT %d", PLID);
+        *protocol = 'U';  // UDP para o comando "quit"
+    }
+    else if (strcmp(input, "exit") == 0) {
+        snprintf(formatted_command, BUF_SIZE, "QUT %d", PLID);
+        *protocol = 'U';  // UDP para o comando "exit"
+    }
+    else if (sscanf(input, "debug %d %d %1s %1s %1s %1s", &PLID, &max_playtime, c1, c2, c3, c4) == 6) {
+        snprintf(formatted_command, BUF_SIZE, "DBG %d %d %s %s %s %s", PLID, max_playtime, c1, c2, c3, c4);
+        *protocol = 'U';  // UDP para o comando "debug"
+    }
     else {
         *protocol = 'X';  // X indica um comando não reconhecido
     }

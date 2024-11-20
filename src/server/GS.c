@@ -24,10 +24,11 @@ void handle_udp_request(int sockfd, struct sockaddr_in *client_addr) {
     printf("Recebido (UDP): %s\n", buffer);
 
     // Envia resposta ao cliente UDP
+    /*
     const char *response = "Mensagem recebida no servidor (UDP)";
     if (sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)client_addr, client_len) < 0) {
         perror("Erro ao enviar resposta UDP");
-    }
+    }*/
 }
 
 void handle_tcp_request(int sockfd, int client_sockfd, struct sockaddr_in *client_addr) {
@@ -41,10 +42,12 @@ void handle_tcp_request(int sockfd, int client_sockfd, struct sockaddr_in *clien
     printf("Recebido (TCP): %s\n", buffer);
 
     // Envia resposta ao cliente TCP
+    /*
     const char *response = "Mensagem recebida no servidor (TCP)";
     if (write(client_sockfd, response, strlen(response)) < 0) {
         perror("Erro ao enviar resposta TCP");
     }
+    */
 
     close(client_sockfd);  // Fecha a conexão após responder
 }
@@ -147,6 +150,7 @@ int main(int argc, char *argv[]) {
         }
 
         // Processa requisição TCP
+        /*
         if (FD_ISSET(server_socket_tcp, &read_fds)) {
             struct sockaddr_in client_addr;
             socklen_t client_len = sizeof(client_addr);
@@ -157,6 +161,7 @@ int main(int argc, char *argv[]) {
             }
             handle_tcp_request(server_socket_tcp, client_socket, &client_addr);
         }
+        */
     }
 
     freeaddrinfo(res_udp);
