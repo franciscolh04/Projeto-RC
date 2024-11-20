@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -g
+CFLAGS = -Wall
 
 # Diretórios
 SERVER_SRC = src/server/GS.c
