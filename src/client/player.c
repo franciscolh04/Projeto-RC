@@ -13,7 +13,8 @@
 
 int PLID = -1;
 int MAX_PLAYTIME = 0;
-int NUM_TRIALS = 0;
+int NUM_TRIALS = 1;
+int EXIT = 0;
 
 // Funções para configurar os sockets
 void setup_udp_socket(int *sockfd, struct sockaddr_in *server_addr, char *server_ip, int port);
@@ -59,7 +60,7 @@ int main(int argc, char *argv[]) {
     setup_udp_socket(&sock_fd_udp, &server_addr, server_ip, port);
 
     // Loop principal para interações contínuas
-    while (1) {
+    while (!EXIT) {
         printf("Digite um comando para enviar ao servidor (ou 'exit' para sair): ");
         fgets(buffer, BUF_SIZE, stdin);
         buffer[strcspn(buffer, "\n")] = 0;  // Remover a nova linha do final da string
@@ -180,43 +181,75 @@ void interpret_server_response(const char *response) {
     //printf("Resposta do servidor: %s\n", response);
     char command[BUF_SIZE];
     char status[BUF_SIZE];
-
-    // Extrai o comando e o status da resposta
-    /*
-    if (sscanf(response, "%s %s", command, status) < 2) {
-        printf("Resposta do servidor mal formatada: %s\n", response);
-        return;
-    }
-    */
+    int nB, nW;
+    char c1[2], c2[2], c3[2], c4[2];
 
     // Lida com diferentes comandos recebidos do servidor
     if (sscanf(response, "RSG %s\n", status) == 1) {
         if (strcmp(status, "OK") == 0) {
             printf("New game started (max %d sec)\n", MAX_PLAYTIME);
         } else if (strcmp(status, "NOK") == 0) {
-            printf("The player has an ongoing game.\n");
+            printf("The player has an ongoing game\n");
         } else if (strcmp(status, "ERR") == 0) {
             printf("Invalid arguments for specified command.\nUsage: start PLID (6-digit IST ID) max_playtime (up to 600 sec)\n");
         }
-    } else if (sscanf(command, "RTR %s\n", status) == 1) {
-        // Adicionar tratamento para o comando "RTR"
+    } else if (sscanf(response, "RTR OK %d %d %d\n", &NUM_TRIALS, &nB, &nW) == 3) {
+        if (nB == 4) {
+            printf("WELL DONE! You guessed the key in %d trials\n", NUM_TRIALS);
+            NUM_TRIALS = 1;
+        } else {
+            printf("nB = %d, nW = %d\n", nB, nW);
+            NUM_TRIALS++;
+        }
+    } else if (sscanf(response, "RTR ENT %1s %1s %1s %1s\n", c1, c2, c3, c4) == 4) {
+        printf("No more attempts available. The secret key was %s %s %s %s\n", c1, c2, c3, c4);
+        NUM_TRIALS = 1;
+    } else if (sscanf(response, "RTR ETM %1s %1s %1s %1s\n", c1, c2, c3, c4) == 4) {
+        printf("Time is up. The secret key was %s %s %s %s\n", c1, c2, c3, c4);
+        NUM_TRIALS = 1;
+    } else if (sscanf(response, "RTR %s\n", status) == 1) {
+        if (strcmp(status, "DUP") == 0) {
+            printf("Duplicate guess: The secret key you provided matches a previous trial\n");
+        } else if (strcmp(status, "INV") == 0) {
+            printf("Invalid trial: The trial number is either not the expected value or does not match the previous guess for the current trial number\n");
+        } else if (strcmp(status, "NOK") == 0) {
+            printf("To make a guess you have to start a game first. Use: start PLID max_playtime\n");
+        } else if (strcmp(status, "ERR") == 0) {
+            printf("Invalid arguments for specified command.\n Usage: try c1 c2 c3 c4 (ci pertence {R, G, B, Y, O, P})\n");
+        }
+    } else if (sscanf(response, "RQT OK %1s %1s %1s %1s\n", c1, c2, c3, c4) == 4) {
+        printf("The ongoing game has been terminated. The secret key was %s %s %s %s\n", c1, c2, c3, c4);
+    } else if (sscanf(response, "RQT %s\n", status) == 1) {
+        if (strcmp(status, "NOK") == 0) {
+            printf("No ongoing game: The player does not have an active game to quit\n");
+        } else if (strcmp(status, "ERR") == 0) {
+            printf("The quit request could not be processed.\n");
+        }
+    } else if (sscanf(response, "RDB %s", status) == 1) {
+        if (strcmp(status, "OK") == 0) {
+            printf("New game started (max %d sec)\n", MAX_PLAYTIME);
+        } else if (strcmp(status, "NOK") == 0) {
+            printf("The player has an ongoing game\n");
+        } else if (strcmp(status, "ERR") == 0) {
+            printf("Invalid arguments for specified command.\nUsage: debug PLID (6-digit IST ID) max_playtime (up to 600 sec) c1 c2 c3 c4\n");
+        }
+    } else {
+        printf("ERR\n");
     }
 }
 
 
 void process_command(const char *input, char *formatted_command, char *protocol) {
     char command[BUF_SIZE];
-    int max_playtime;
     char c1[2], c2[2], c3[2], c4[2];
 
     // Análise do comando e definição do protocolo
-    if (sscanf(input, "start %d %d", &PLID, &max_playtime) == 2) {
-        snprintf(formatted_command, BUF_SIZE, "SNG %d %d\n", PLID, max_playtime);
+    if (sscanf(input, "start %d %d", &PLID, &MAX_PLAYTIME) == 2) {
+        snprintf(formatted_command, BUF_SIZE, "SNG %d %d\n", PLID, MAX_PLAYTIME);
         *protocol = 'U';  // UDP para o comando "start"
     } 
     // Adicionar outras condições conforme os outros comandos
     else if (sscanf(input, "try %1s %1s %1s %1s", c1, c2, c3, c4) == 4) {
-        NUM_TRIALS++;
         snprintf(formatted_command, BUF_SIZE, "TRY %d %s %s %s %s %d\n", PLID, c1, c2, c3, c4, NUM_TRIALS);
         *protocol = 'U';  // UDP para o comando "try"
     }
@@ -229,19 +262,20 @@ void process_command(const char *input, char *formatted_command, char *protocol)
         *protocol = 'T';  // TCP para o comando "scoreboard"
     }
     else if (strcmp(input, "quit") == 0) {
-        NUM_TRIALS = 0;
+        NUM_TRIALS = 1;
         MAX_PLAYTIME = 0;
         snprintf(formatted_command, BUF_SIZE, "QUT %d\n", PLID);
         *protocol = 'U';  // UDP para o comando "quit"
     }
     else if (strcmp(input, "exit") == 0) {
-        NUM_TRIALS = 0;
+        NUM_TRIALS = 1;
         MAX_PLAYTIME = 0;
         snprintf(formatted_command, BUF_SIZE, "QUT %d\n", PLID);
         *protocol = 'U';  // UDP para o comando "exit"
+        EXIT = 1;
     }
-    else if (sscanf(input, "debug %d %d %1s %1s %1s %1s", &PLID, &max_playtime, c1, c2, c3, c4) == 6) {
-        snprintf(formatted_command, BUF_SIZE, "DBG %d %d %s %s %s %s\n", PLID, max_playtime, c1, c2, c3, c4);
+    else if (sscanf(input, "debug %d %d %1s %1s %1s %1s", &PLID, &MAX_PLAYTIME, c1, c2, c3, c4) == 6) {
+        snprintf(formatted_command, BUF_SIZE, "DBG %d %d %s %s %s %s\n", PLID, MAX_PLAYTIME, c1, c2, c3, c4);
         *protocol = 'U';  // UDP para o comando "debug"
     }
     else {
