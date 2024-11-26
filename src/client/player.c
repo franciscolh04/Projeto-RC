@@ -91,6 +91,50 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
+int save_file(int sockfd, const char *filename, int filesize) {
+    printf("A receber ficheiro '%s' (%d bytes)...\n", filename, filesize);
+
+    // Abre o ficheiro local para escrita
+    FILE *file = fopen(filename, "wb");
+    if (!file) {
+        perror("Erro ao abrir ficheiro para escrita");
+        return 0;
+    }
+
+    // Recebe o conteúdo do ficheiro em blocos
+    char buffer[BUF_SIZE];
+    int bytes_received = 0;
+    while (bytes_received < filesize) {
+        int chunk_size = read(sockfd, buffer, BUF_SIZE);
+        if (chunk_size <= 0) {
+            perror("Erro ao receber ficheiro");
+            fclose(file);
+            return 0;
+        }
+
+        fwrite(buffer, 1, chunk_size, file); // Escreve o bloco no ficheiro
+        bytes_received += chunk_size;
+
+        printf("Recebidos %d/%d bytes...\n", bytes_received, filesize);
+    }
+
+    fclose(file);
+    printf("Ficheiro '%s' recebido e armazenado com sucesso!\n", filename);
+
+    // Mostra o conteúdo do ficheiro na consola
+    printf("Conteúdo do ficheiro '%s':\n", filename);
+    FILE *read_file = fopen(filename, "r");
+    if (read_file) {
+        while (fgets(buffer, BUF_SIZE, read_file)) {
+            printf("%s", buffer);
+        }
+        fclose(read_file);
+    }
+
+    return 1;
+}
+
+
 // Configuração do socket UDP
 void setup_udp_socket(int *sockfd, struct sockaddr_in *server_addr, char *server_ip, int port) {
     *sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -164,21 +208,54 @@ int send_tcp_message(struct sockaddr_in *server_addr, char *server_ip, int port,
         return 0;
     }
 
-    int n = read(sockfd, response, BUF_SIZE);
-    if (n < 0) {
-        perror("Erro ao receber resposta do servidor (TCP)");
-        close(sockfd);
-        return 0;
+    int total_read = 0;
+    int n;
+
+    // Lê a resposta inicial do servidor
+    while (total_read < BUF_SIZE - 1) {
+        n = read(sockfd, response + total_read, BUF_SIZE - 1 - total_read);
+        if (n < 0) {
+            perror("Erro ao receber resposta do servidor (TCP)");
+            close(sockfd);
+            return 0;
+        }
+            if (n == 0) { // Conexão fechada pelo servidor
+            break;
+        }
+            total_read += n;
     }
 
-    response[n] = '\0'; // Garantir que a mensagem é uma string válida
+    response[total_read] = '\0'; // Garante que a mensagem é uma string válida
+    printf("Resposta inicial do servidor: %s\n", response);
+
+    // Verifica o status da resposta
+    char status[BUF_SIZE], filename[BUF_SIZE];
+    int filesize;
+
+    if (sscanf(response, "RST %s %s %d", status, filename, &filesize) >= 2) {
+        if (strcmp(status, "ACT") == 0 || strcmp(status, "FIN") == 0) {
+            // Chama a função save_file para processar o ficheiro
+            if (!save_file(sockfd, filename, filesize)) {
+                printf("Erro ao guardar o ficheiro '%s'.\n", filename);
+            }
+        } else if (strcmp(status, "NOK") == 0) {
+            printf("Nenhum jogo ativo ou terminado encontrado para este jogador.\n");
+        } else {
+            printf("Erro: Status desconhecido recebido do servidor: %s\n", status);
+        }
+    } else {
+        printf("Erro: Resposta mal formatada do servidor.\n");
+    }
+
+    // Fecha a conexão TCP após processar a resposta
     close(sockfd);
     return 1;
 }
 
+
 // Interpretar a resposta do servidor
 void interpret_server_response(const char *response) {
-    //printf("Resposta do servidor: %s\n", response);
+    printf("Resposta do servidor: %s\n", response);
     char command[BUF_SIZE];
     char status[BUF_SIZE];
     int nB, nW;
