@@ -28,6 +28,7 @@ void interpret_server_response(const char *response);
 // Função para processar o comando do utilizador
 void process_command(const char *input, char *formatted_command, char *protocol);
 
+
 int main(int argc, char *argv[]) {
     int port = DEFAULT_PORT + GN;
     int sock_fd_udp;
@@ -91,8 +92,9 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-int save_file(int sockfd, const char *filename, int filesize) {
-    printf("A receber ficheiro '%s' (%d bytes)...\n", filename, filesize);
+
+int save_file(const char *response, const char *filename, int filesize) {
+    printf("A processar ficheiro '%s' (%d bytes)...\n", filename, filesize);
 
     // Abre o ficheiro local para escrita
     FILE *file = fopen(filename, "wb");
@@ -101,35 +103,38 @@ int save_file(int sockfd, const char *filename, int filesize) {
         return 0;
     }
 
-    // Recebe o conteúdo do ficheiro em blocos
-    char buffer[BUF_SIZE];
-    int bytes_received = 0;
-    while (bytes_received < filesize) {
-        int chunk_size = read(sockfd, buffer, BUF_SIZE);
+    // Encontra o início dos dados do ficheiro no buffer
+    const char *file_data = strchr(response, '\n'); // Localiza o primeiro '\n' (fim da linha do cabeçalho)
+    if (!file_data) {
+        printf("Erro: Cabeçalho mal formatado na resposta.\n");
+        fclose(file);
+        return 0;
+    }
+    file_data += 1; // Avança para depois do '\n'
+
+    // Calcula o comprimento dos dados (tamanho da resposta - posição após o cabeçalho)
+    int data_len = strlen(file_data); // Calcula o comprimento da string a partir da posição atual dos dados
+
+    if (data_len < filesize) {
+        printf("Erro: Dados do ficheiro incompletos na resposta (%d/%d bytes).\n", data_len, filesize);
+        fclose(file);
+        return 0;
+    }
+
+    // Escreve os dados no ficheiro em loop
+    int bytes_written = 0;
+    while (bytes_written < filesize) {
+        int chunk_size = fwrite(file_data + bytes_written, 1, filesize - bytes_written, file);
         if (chunk_size <= 0) {
-            perror("Erro ao receber ficheiro");
+            perror("Erro ao escrever ficheiro");
             fclose(file);
             return 0;
         }
-
-        fwrite(buffer, 1, chunk_size, file); // Escreve o bloco no ficheiro
-        bytes_received += chunk_size;
-
-        printf("Recebidos %d/%d bytes...\n", bytes_received, filesize);
+        bytes_written += chunk_size;
     }
 
     fclose(file);
     printf("Ficheiro '%s' recebido e armazenado com sucesso!\n", filename);
-
-    // Mostra o conteúdo do ficheiro na consola
-    printf("Conteúdo do ficheiro '%s':\n", filename);
-    FILE *read_file = fopen(filename, "r");
-    if (read_file) {
-        while (fgets(buffer, BUF_SIZE, read_file)) {
-            printf("%s", buffer);
-        }
-        fclose(read_file);
-    }
 
     return 1;
 }
@@ -151,6 +156,7 @@ void setup_udp_socket(int *sockfd, struct sockaddr_in *server_addr, char *server
         exit(EXIT_FAILURE);
     }
 }
+
 
 // Configuração de socket TCP
 void setup_tcp_socket(int *sockfd, struct sockaddr_in *server_addr, char *server_ip, int port) {
@@ -176,6 +182,7 @@ void setup_tcp_socket(int *sockfd, struct sockaddr_in *server_addr, char *server
     }
 }
 
+
 // Enviar mensagem UDP e retornar a resposta
 int send_udp_message(int sockfd, struct sockaddr_in *server_addr, char *message, char *response) {
     if (sendto(sockfd, message, strlen(message), 0, (struct sockaddr *)server_addr, sizeof(*server_addr)) < 0) {
@@ -190,9 +197,10 @@ int send_udp_message(int sockfd, struct sockaddr_in *server_addr, char *message,
         return 0;
     }
 
-    response[n] = '\0'; // Garantir que a mensagem é uma string válida
+    response[n] = '\0'; // Garante que a mensagem é uma string válida
     return 1;
 }
+
 
 // Estabelecer conexão TCP, enviar mensagem, receber resposta e fechar conexão e retornar a resposta
 int send_tcp_message(struct sockaddr_in *server_addr, char *server_ip, int port, char *message, char *response) {
@@ -202,14 +210,18 @@ int send_tcp_message(struct sockaddr_in *server_addr, char *server_ip, int port,
     setup_tcp_socket(&sockfd, server_addr, server_ip, port);
 
     // Envia a mensagem para o servidor
-    if (write(sockfd, message, strlen(message)) < 0) {
-        perror("Erro ao enviar mensagem para o servidor (TCP)");
-        close(sockfd);
-        return 0;
-    }
+    int total_written = 0, total_read = 0, n;
+    int bytes_to_write = strlen(message);
 
-    int total_read = 0;
-    int n;
+    while (total_written < bytes_to_write) {
+        n = write(sockfd, message + total_written, bytes_to_write - total_written);
+        if (n < 0) {
+            perror("Erro ao enviar mensagem para o servidor (TCP)");
+            close(sockfd);
+            return 0;
+        }
+        total_written += n;
+    }
 
     // Lê a resposta inicial do servidor
     while (total_read < BUF_SIZE - 1) {
@@ -219,33 +231,13 @@ int send_tcp_message(struct sockaddr_in *server_addr, char *server_ip, int port,
             close(sockfd);
             return 0;
         }
-            if (n == 0) { // Conexão fechada pelo servidor
+        if (n == 0) { // Conexão fechada pelo servidor
             break;
         }
             total_read += n;
     }
 
     response[total_read] = '\0'; // Garante que a mensagem é uma string válida
-    printf("Resposta inicial do servidor: %s\n", response);
-
-    // Verifica o status da resposta
-    char status[BUF_SIZE], filename[BUF_SIZE];
-    int filesize;
-
-    if (sscanf(response, "RST %s %s %d", status, filename, &filesize) >= 2) {
-        if (strcmp(status, "ACT") == 0 || strcmp(status, "FIN") == 0) {
-            // Chama a função save_file para processar o ficheiro
-            if (!save_file(sockfd, filename, filesize)) {
-                printf("Erro ao guardar o ficheiro '%s'.\n", filename);
-            }
-        } else if (strcmp(status, "NOK") == 0) {
-            printf("Nenhum jogo ativo ou terminado encontrado para este jogador.\n");
-        } else {
-            printf("Erro: Status desconhecido recebido do servidor: %s\n", status);
-        }
-    } else {
-        printf("Erro: Resposta mal formatada do servidor.\n");
-    }
 
     // Fecha a conexão TCP após processar a resposta
     close(sockfd);
@@ -256,12 +248,10 @@ int send_tcp_message(struct sockaddr_in *server_addr, char *server_ip, int port,
 // Interpretar a resposta do servidor
 void interpret_server_response(const char *response) {
     printf("Resposta do servidor: %s\n", response);
-    char command[BUF_SIZE];
-    char status[BUF_SIZE];
-    int nB, nW;
+    char command[BUF_SIZE], status[BUF_SIZE], filename[BUF_SIZE];
     char c1[2], c2[2], c3[2], c4[2];
+    int filesize, nB, nW;
 
-    // Lida com diferentes comandos recebidos do servidor
     if (sscanf(response, "RSG %s\n", status) == 1) {
         if (strcmp(status, "OK") == 0) {
             printf("New game started (max %d sec)\n", MAX_PLAYTIME);
@@ -309,6 +299,22 @@ void interpret_server_response(const char *response) {
             printf("The player has an ongoing game\n");
         } else if (strcmp(status, "ERR") == 0) {
             printf("Invalid arguments for specified command.\nUsage: debug PLID (6-digit IST ID) max_playtime (up to 600 sec) c1 c2 c3 c4\n");
+        }
+    } else if (sscanf(response, "RST %s %s %d", status, filename, &filesize) >= 1) {
+        if (strcmp(status, "ACT") == 0 || strcmp(status, "FIN") == 0) {
+            if (!save_file(response, filename, filesize)) {
+                printf("Erro ao guardar o ficheiro '%s'.\n", filename);
+            }
+        } else if (strcmp(status, "NOK") == 0) {
+            printf("Nenhum jogo ativo ou terminado encontrado para este jogador.\n");
+        }
+    } else if (sscanf(response, "RSS %s %s %d", status, filename, &filesize) >= 1) {
+        if (strcmp(status, "EMPTY") == 0) {
+            printf("vazio\n");
+        } else if (strcmp(status, "OK") == 0) {
+            if (!save_file(response, filename, filesize)) {
+                printf("Erro ao guardar o ficheiro '%s'.\n", filename);
+            }
         }
     } else {
         printf("ERR\n");
