@@ -252,6 +252,7 @@ void interpret_server_response(const char *response) {
     char c1[2], c2[2], c3[2], c4[2];
     int filesize, nB, nW;
 
+    // RSG
     if (sscanf(response, "RSG %s\n", status) == 1) {
         if (strcmp(status, "OK") == 0) {
             printf("New game started (max %d sec)\n", MAX_PLAYTIME);
@@ -260,6 +261,7 @@ void interpret_server_response(const char *response) {
         } else if (strcmp(status, "ERR") == 0) {
             printf("Invalid arguments for specified command.\nUsage: start PLID (6-digit IST ID) max_playtime (up to 600 sec)\n");
         }
+    // RTR
     } else if (sscanf(response, "RTR OK %d %d %d\n", &NUM_TRIALS, &nB, &nW) == 3) {
         if (nB == 4) {
             printf("WELL DONE! You guessed the key in %d trials\n", NUM_TRIALS);
@@ -284,6 +286,7 @@ void interpret_server_response(const char *response) {
         } else if (strcmp(status, "ERR") == 0) {
             printf("Invalid arguments for specified command.\n Usage: try c1 c2 c3 c4 (ci pertence {R, G, B, Y, O, P})\n");
         }
+    // RQT
     } else if (sscanf(response, "RQT OK %1s %1s %1s %1s\n", c1, c2, c3, c4) == 4) {
         printf("The ongoing game has been terminated. The secret key was %s %s %s %s\n", c1, c2, c3, c4);
     } else if (sscanf(response, "RQT %s\n", status) == 1) {
@@ -292,6 +295,7 @@ void interpret_server_response(const char *response) {
         } else if (strcmp(status, "ERR") == 0) {
             printf("The quit request could not be processed.\n");
         }
+    // RDB
     } else if (sscanf(response, "RDB %s", status) == 1) {
         if (strcmp(status, "OK") == 0) {
             printf("New game started (max %d sec)\n", MAX_PLAYTIME);
@@ -300,6 +304,7 @@ void interpret_server_response(const char *response) {
         } else if (strcmp(status, "ERR") == 0) {
             printf("Invalid arguments for specified command.\nUsage: debug PLID (6-digit IST ID) max_playtime (up to 600 sec) c1 c2 c3 c4\n");
         }
+    // RST
     } else if (sscanf(response, "RST %s %s %d", status, filename, &filesize) >= 1) {
         if (strcmp(status, "ACT") == 0 || strcmp(status, "FIN") == 0) {
             if (!save_file(response, filename, filesize)) {
@@ -308,6 +313,7 @@ void interpret_server_response(const char *response) {
         } else if (strcmp(status, "NOK") == 0) {
             printf("Nenhum jogo ativo ou terminado encontrado para este jogador.\n");
         }
+    // RSS
     } else if (sscanf(response, "RSS %s %s %d", status, filename, &filesize) >= 1) {
         if (strcmp(status, "EMPTY") == 0) {
             printf("vazio\n");
@@ -316,6 +322,7 @@ void interpret_server_response(const char *response) {
                 printf("Erro ao guardar o ficheiro '%s'.\n", filename);
             }
         }
+    // ERR
     } else {
         printf("ERR\n");
     }

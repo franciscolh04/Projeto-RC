@@ -7,36 +7,57 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <sys/wait.h>
 
 #define DEFAULT_PORT "58000"
 #define GN 0
 #define BUF_SIZE 1024
 
-void handle_udp_request(int sockfd, struct sockaddr_in *client_addr) {
-    printf("vai ler UDP\n");
+// Função para lidar com requisições UDP no processo pai
+void handle_udp_client(int sockfd, struct sockaddr_in client_addr) {
     char buffer[BUF_SIZE];
-    socklen_t client_len = sizeof(*client_addr);
-    int n = recvfrom(sockfd, buffer, BUF_SIZE, 0, (struct sockaddr *)client_addr, &client_len);
+    socklen_t client_len = sizeof(client_addr);
+
+    printf("Processo pai a tratar cliente UDP %s:%d\n",
+           inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+
+    // Recebe mensagem do cliente
+    int n = recvfrom(sockfd, buffer, BUF_SIZE, 0, (struct sockaddr *)&client_addr, &client_len);
     if (n < 0) {
         perror("Erro ao receber pacote UDP");
         return;
     }
-    buffer[n] = '\0';
-    printf("Recebido (UDP): %s\n", buffer);
 
-    const char *response = "Mensagem recebida no servidor (UDP)";
-    if (sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)client_addr, client_len) < 0) {
+    buffer[n] = '\0'; // Termina a string
+    printf("Recebido do cliente UDP: %s\n", buffer);
+
+    const char *response;
+
+    // Processa a mensagem recebida
+    if (strncmp(buffer, "SNG", 3) == 0) {
+        printf("Comando 'start' recebido do cliente.\n");
+        response = "RSG OK\n";  // Resposta simulada para iniciar jogo
+    } else if (strncmp(buffer, "QUT", 3) == 0) {
+        printf("Comando 'exit' recebido do cliente.\n");
+        response = "BYE\n";
+    } else {
+        printf("Comando desconhecido recebido.\n");
+        response = "ERR Comando desconhecido\n";
+    }
+
+    // Envia resposta ao cliente
+    if (sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&client_addr, client_len) < 0) {
         perror("Erro ao enviar resposta UDP");
     }
 }
 
 void handle_tcp_request(int client_sockfd) {
-    printf("vai ler TCP\n");
     char buffer[BUF_SIZE];
     int n = read(client_sockfd, buffer, BUF_SIZE - 1);
 
     if (n < 0) {
         perror("Erro ao ler do socket TCP");
+        close(client_sockfd);
         return;
     } else if (n == 0) {
         printf("Cliente fechou a conexão (TCP).\n");
@@ -140,10 +161,11 @@ int main(int argc, char *argv[]) {
             exit(1);
         }
 
-        // Processar UDP
+        // Processar UDP (no processo pai)
         if (FD_ISSET(server_socket_udp, &read_fds)) {
             struct sockaddr_in client_addr;
-            handle_udp_request(server_socket_udp, &client_addr);
+            socklen_t client_len = sizeof(client_addr);
+            handle_udp_client(server_socket_udp, client_addr);
         }
 
         // Processar TCP
@@ -156,14 +178,29 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            // Adiciona cliente ao select
-            handle_tcp_request(client_socket);
+            pid_t pid = fork();
+            if (pid < 0) {
+                perror("Erro ao criar processo filho");
+                close(client_socket);
+            } else if (pid == 0) {
+                // Processo filho lida com este cliente TCP
+                close(server_socket_tcp); // O filho não precisa do socket de escuta
+                handle_tcp_request(client_socket);
+                exit(0); // Termina o processo filho
+            } else {
+                // Processo pai
+                close(client_socket); // O pai não precisa do socket cliente
+            }
         }
+
+        // Evitar processos zumbis
+        while (waitpid(-1, NULL, WNOHANG) > 0);
     }
 
     freeaddrinfo(res_udp);
     freeaddrinfo(res_tcp);
     close(server_socket_udp);
     close(server_socket_tcp);
+
     return 0;
 }
