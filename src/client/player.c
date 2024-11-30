@@ -16,17 +16,17 @@ int MAX_PLAYTIME = 0;
 int NUM_TRIALS = 1;
 int EXIT = 0;
 
-// Funções para configurar os sockets
+// Funções para configurar os sockets e enviar mensagens
 void setup_udp_socket(int *sockfd, struct sockaddr_in *server_addr, char *server_ip, int port);
 void setup_tcp_socket(int *sockfd, struct sockaddr_in *server_addr, char *server_ip, int port);
 int send_udp_message(int sockfd, struct sockaddr_in *server_addr, char *message, char *response);
 int send_tcp_message(struct sockaddr_in *server_addr, char *server_ip, int port, char *message, char *response);
 
-// Função para interpretar a resposta do servidor
-void interpret_server_response(const char *response);
-
 // Função para processar o comando do utilizador
 void process_command(const char *input, char *formatted_command, char *protocol);
+
+// Função para interpretar a resposta do servidor
+void interpret_server_response(const char *response);
 
 
 int main(int argc, char *argv[]) {
