@@ -15,9 +15,8 @@ void add_player(Player **players_list, int player_id, char mode) {
 
 
 // Função para iniciar um novo jogo
-void start_game(Game **games_list, Player *player, int game_id, int *secret_code) {
+void start_game(Game **games_list, Player *player, char *secret_code) {
     Game *new_game = (Game *)malloc(sizeof(Game));
-    new_game->game_id = game_id;
     memcpy(new_game->secret_code, secret_code, sizeof(char) * 4);  // Copia o código secreto
     new_game->player = player;
     new_game->trials_count = 0;

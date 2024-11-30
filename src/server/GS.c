@@ -9,6 +9,7 @@
 #include <netdb.h>
 #include <sys/wait.h>
 #include "state.h"
+#include "command_handler.h"
 
 
 #define DEFAULT_PORT "58000"
@@ -265,17 +266,17 @@ const char* interpret_player_request(const char *message) {
 
     // Compara o comando extraído
     if (strcmp(command, "SNG") == 0) {
-        return "RSG OK\n";
+        return handle_start(message);
     } else if (strcmp(command, "TRY") == 0) {
-        return "RTR OK\n";
+        return handle_try();
     } else if (strcmp(command, "STR") == 0) {
-        return "RST OK\n";
+        return handle_show_trials();
     } else if (strcmp(command, "SSB") == 0) {
-        return "RSS OK\n";
+        return handle_scoreboard();
     } else if (strcmp(command, "DBG") == 0) {
-        return "RDB OK\n";
+        return handle_debug();
     } else if (strcmp(command, "QUT") == 0) {
-        return "RQT OK\n";
+        return handle_quit();
     } else {
         return "ERR Comando desconhecido\n";
     }

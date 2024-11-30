@@ -1,6 +1,7 @@
 #ifndef STATE_H
 #define STATE_H
 
+
 // Estrutura para guardar o estado de um jogador
 typedef struct Player {
     int player_id;             // ID único do jogador
@@ -21,9 +22,13 @@ typedef struct Game {
     struct Game *next;        // Ponteiro para o próximo jogo (lista ligada)
 } Game;
 
+// Variáveis globais definidas em GS.c
+extern Player *players_head;  // Lista ligada de jogadores
+extern Game *games_head;      // Lista ligada de jogos
+
 // Protótipos das funções
 void add_player(Player **players_list, int player_id, char mode);
-void start_game(Game **games_list, Player *player, int game_id, int *secret_code);
+void start_game(Game **games_list, Player *player, char *secret_code);
 void end_game(Game *game, Player *player);
 Player* find_player(Player *players_list, int player_id);
 Game* find_game(Player *players_list);
