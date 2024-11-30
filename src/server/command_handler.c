@@ -42,11 +42,11 @@ const char* handle_start(const char* request) {
     return "RSG OK\n";
 }
 
-const char* handle_try() {
+const char* handle_try(const char* request) {
     return "RTR OK\n";
 }
 
-const char* handle_show_trials() {
+const char* handle_show_trials(const char* request) {
     return "RST OK\n";
 }
 
@@ -54,10 +54,37 @@ const char* handle_scoreboard() {
     return "RSS OK\n";
 }
 
-const char* handle_debug() {
+const char* handle_debug(const char* request) {
     return "RDB OK\n";
 }
 
-const char* handle_quit() {
-    return "RQT OK\n";
+const char* handle_quit(const char* request) {
+    int plid;
+    // Verificar a sintaxe do comando
+    if (sscanf(request, "QUT %d ", &plid) != 1) {
+        return "RQT ERR\n";
+    }
+
+    // Verificar se o jogador tem um jogo ativo
+    Player* player = find_player(players_head, plid);
+    if (player == NULL) {
+        return "RQT ERR\n"; // Jogador não encontrado ou sem jogo ativo
+    }
+    else if (player->current_game == NULL) {
+        return "RQT NOK\n"; // O jogador não tem um jogo ativo
+    }
+
+    // Terminar o jogo e responder com sucesso
+    Game *game = player->current_game;
+    const char *secret_code = game->secret_code;
+    end_game(game, player);
+
+    static char response[15];
+    // Formatar a resposta com a chave secreta
+    snprintf(response, sizeof(response), "RQT OK %c %c %c %c\n", 
+             secret_code[0], 
+             secret_code[1], 
+             secret_code[2], 
+             secret_code[3]);
+    return response;
 }

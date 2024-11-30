@@ -268,15 +268,15 @@ const char* interpret_player_request(const char *message) {
     if (strcmp(command, "SNG") == 0) {
         return handle_start(message);
     } else if (strcmp(command, "TRY") == 0) {
-        return handle_try();
+        return handle_try(message);
     } else if (strcmp(command, "STR") == 0) {
-        return handle_show_trials();
+        return handle_show_trials(message);
     } else if (strcmp(command, "SSB") == 0) {
         return handle_scoreboard();
     } else if (strcmp(command, "DBG") == 0) {
-        return handle_debug();
+        return handle_debug(message);
     } else if (strcmp(command, "QUT") == 0) {
-        return handle_quit();
+        return handle_quit(message);
     } else {
         return "ERR Comando desconhecido\n";
     }
