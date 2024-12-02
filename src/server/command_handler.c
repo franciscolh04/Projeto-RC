@@ -70,8 +70,17 @@ const char* handle_quit(const char* request) {
         return "RQT ERR\n"; // Erro ao obter informações do jogo
     }
 
+    // Obter a hora de início do jogo ativo
+    time_t start_time;
+    if (!get_start_time(plid, &start_time)) {
+        return "RQT ERR\n"; // Erro ao obter a hora de início do jogo
+    }
+
+    // Calcula o tempo total de jogo
+    time_t now = time(NULL); // Hora atual
+    int total_time = (int)difftime(now, start_time); // Calcula a diferença em segundos
+
     // Finalizar o jogo
-    int total_time = 300; // Exemplo de tempo total; ajustar conforme necessário
     if (!close_game(plid, total_time, 'Q')) { // Passa 'Q' como código de encerramento
         return "RQT ERR\n"; // Erro ao terminar o jogo
     }

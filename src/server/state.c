@@ -63,8 +63,8 @@ void save_play(int plid, const char *attempt, int nB, int nW, int time_elapsed) 
 }
 
 int get_secret_code(int plid, char* secret_code) {
-    char filepath[64];
-    snprintf(filepath, sizeof(filepath), "GAMES/GAME_%d.txt", plid); // Caminho do ficheiro do jogo
+    char filepath[128];
+    snprintf(filepath, sizeof(filepath), "%sGAME_%06d.txt", GAMES_DIR, plid); // Usa o GAMES_DIR definido
 
     FILE *file = fopen(filepath, "r");
     if (file == NULL) {
@@ -72,12 +72,34 @@ int get_secret_code(int plid, char* secret_code) {
         return 0; // Falha na leitura do ficheiro
     }
 
-    // Lê a primeira linha do ficheiro, onde o código secreto é armazenado
-    if (fscanf(file, "%*s %*d %4s", secret_code) != 1) { // Ignora os campos anteriores
+    // Lê a primeira linha do ficheiro e extrai o código secreto
+    if (fscanf(file, "%*06d %*c %4s", secret_code) != 1) { // Ignora PLID e Modo, lê o código secreto
         fclose(file);
         return 0; // Falha ao ler o código secreto
     }
 
+    fclose(file);
+    return 1; // Sucesso
+}
+
+int get_start_time(int plid, time_t* start_time) {
+    char filepath[128];
+    snprintf(filepath, sizeof(filepath), "%sGAME_%06d.txt", GAMES_DIR, plid);
+
+    FILE *file = fopen(filepath, "r");
+    if (file == NULL) {
+        perror("Erro ao abrir o ficheiro do jogo");
+        return 0; // Falha na leitura do ficheiro
+    }
+
+    // Lê a linha inicial do ficheiro no formato: PLID M CCCC T YYYY-MM-DD HH:MM:SS s
+    long start_timestamp;
+    if (fscanf(file, "%*06d %*c %*4s %*d %*s %*s %ld", &start_timestamp) != 1) {
+        fclose(file);
+        return 0; // Falha ao ler o timestamp
+    }
+
+    *start_time = (time_t)start_timestamp; // Converte o timestamp para time_t
     fclose(file);
     return 1; // Sucesso
 }
@@ -112,7 +134,7 @@ int close_game(int plid, int total_time, char end_code) {
 
     // Formatar o nome do ficheiro final no diretório do jogador
     strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", t);
-    snprintf(new_filename, sizeof(new_filename), "%s%d/GAME_%s_%c.txt", 
+    snprintf(new_filename, sizeof(new_filename), "%s%d/%s_%c.txt", 
              GAMES_DIR, plid, timestamp, end_code);
 
     // Move o ficheiro para o diretório final
