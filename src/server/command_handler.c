@@ -18,29 +18,22 @@ const char* handle_start(const char* request) {
         return "RSG ERR\n";
     }
 
-    // Verificar se o jogador já existe
-    Player* player = find_player(players_head, plid);
-    if (player == NULL) {
-        // Adicionar novo jogador se não existir
-        add_player(&players_head, plid, 'P');
-        player = find_player(players_head, plid);
-    }
-
     // Verificar se o jogador já tem um jogo ativo
-    if (player->current_game != NULL && player->current_game->is_active) {
+    if (has_active_game(plid)) {
         return "RSG NOK\n"; // O jogador já tem um jogo em andamento
     }
 
-    // Criar um novo jogo
+    // Criar o código secreto para o novo jogo
     char *secret_code = (char *)malloc(CODE_SIZE * sizeof(char));
-    generateCode(secret_code); // Gerar código secreto aleatório
-    start_game(&games_head, player, secret_code); // Criar o jogo com um ID aleatório
-    printf("code: %s\n", secret_code);
-    free(secret_code);
+    generateCode(secret_code);
+
+    // Criar o ficheiro do jogo ativo
+    create_game(plid, secret_code, time, 'P');
 
     // Responder com sucesso
     return "RSG OK\n";
 }
+
 
 const char* handle_try(const char* request) {
     return "RTR OK\n";
@@ -60,31 +53,38 @@ const char* handle_debug(const char* request) {
 
 const char* handle_quit(const char* request) {
     int plid;
+
     // Verificar a sintaxe do comando
-    if (sscanf(request, "QUT %d ", &plid) != 1) {
-        return "RQT ERR\n";
+    if (sscanf(request, "QUT %d", &plid) != 1) {
+        return "RQT ERR\n"; // Erro de sintaxe
     }
 
     // Verificar se o jogador tem um jogo ativo
-    Player* player = find_player(players_head, plid);
-    if (player == NULL) {
-        return "RQT ERR\n"; // Jogador não encontrado ou sem jogo ativo
-    }
-    else if (player->current_game == NULL) {
-        return "RQT NOK\n"; // O jogador não tem um jogo ativo
+    if (!has_active_game(plid)) {
+        return "RQT NOK\n";
     }
 
-    // Terminar o jogo e responder com sucesso
-    Game *game = player->current_game;
-    const char *secret_code = game->secret_code;
-    end_game(game, player);
+    // Obter o código secreto do jogo ativo
+    char secret_code[CODE_SIZE + 1];
+    if (!get_secret_code(plid, secret_code)) {
+        return "RQT ERR\n"; // Erro ao obter informações do jogo
+    }
 
-    static char response[15];
-    // Formatar a resposta com a chave secreta
-    snprintf(response, sizeof(response), "RQT OK %c %c %c %c\n", 
+    // Finalizar o jogo
+    int total_time = 300; // Exemplo de tempo total; ajustar conforme necessário
+    if (!close_game(plid, total_time, 'Q')) { // Passa 'Q' como código de encerramento
+        return "RQT ERR\n"; // Erro ao terminar o jogo
+    }
+
+    // Formatar a resposta com sucesso e o código secreto
+    static char response[32];
+    snprintf(response, sizeof(response), "RQT OK %c %c %c %c\n",
              secret_code[0], 
              secret_code[1], 
              secret_code[2], 
              secret_code[3]);
+
     return response;
 }
+
+

@@ -26,11 +26,6 @@ void handle_tcp_request(int client_sockfd);
 const char* interpret_player_request(const char *message);
 
 
-// Variáveis globais para armazenar as listas ligadas de jogadores e jogos
-Player *players_head = NULL;  // Cabeça da lista ligada de jogadores
-Game *games_head = NULL;      // Cabeça da lista ligada de jogos
-
-
 int main(int argc, char *argv[]) {
     int server_socket_udp, server_socket_tcp;
     int port_num = 58000 + GN;
