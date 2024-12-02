@@ -24,10 +24,10 @@ const char* handle_start(const char* request) {
     }
 
     // Criar o código secreto para o novo jogo
-    char *secret_code = (char *)malloc(CODE_SIZE * sizeof(char));
+    char secret_code[CODE_SIZE + 1];
     generateCode(secret_code);
 
-    // Criar o ficheiro do jogo ativo
+    // Criar o ficheiro de jogo
     create_game(plid, secret_code, time, 'P');
 
     // Responder com sucesso
@@ -48,6 +48,34 @@ const char* handle_scoreboard() {
 }
 
 const char* handle_debug(const char* request) {
+    int plid, time;
+    char c1[2], c2[2], c3[2], c4[2];
+
+    // Verificar a sintaxe do comando
+    if (sscanf(request, "DBG %d %d %1s %1s %1s %1s", &plid, &time, c1, c2, c3, c4) != 6) {
+        return "RDB ERR\n"; // Erro de sintaxe
+    }
+
+    // Verificar PLID e tempo
+    if (plid <= 0 || time < 0 || time > 600) {
+        return "RDB ERR\n";
+    }
+
+    // FALTA VERIFICAR AS CORES
+
+    // Verificar se o jogador já tem um jogo ativo
+    if (has_active_game(plid)) {
+        return "RDB NOK\n"; // O jogador já tem um jogo em andamento
+    }
+
+    // Associa o código secreto fornecido ao novo jogo
+    char secret_code[CODE_SIZE + 1];
+    snprintf(secret_code, sizeof(secret_code), "%c%c%c%c", c1[0], c2[0], c3[0], c4[0]);
+
+    // Criar o ficheiro de jogo
+    create_game(plid, secret_code, time, 'D');
+
+    // Responder com sucesso
     return "RDB OK\n";
 }
 
