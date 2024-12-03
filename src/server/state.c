@@ -7,11 +7,32 @@
 #include <errno.h>
 
 // Verifica se o jogador tem um jogo ativo
-int has_active_game(int plid) {
+int has_active_game(int plid, int flag) {
     char filename[64];
     snprintf(filename, sizeof(filename), "%sGAME_%d.txt", GAMES_DIR, plid);
-    return access(filename, F_OK) == 0; // Retorna 0 se o ficheiro existir
+
+    FILE *file = fopen(filename, "r");
+    if (!file) return 0; // Retorna 0 se o arquivo não existir ou não puder ser aberto
+
+    // QUIT
+    if (flag == 0) {
+        fclose(file);
+        return 1;
+    }
+
+    // START
+    char buffer[256];
+    int line_count = 0;
+
+    // Lê no máximo duas linhas
+    for (int i = 0; i < 2 && fgets(buffer, sizeof(buffer), file); i++) {
+        line_count++;
+    }
+
+    fclose(file);
+    return line_count > 1; // Retorna 1 se houver mais de uma linha
 }
+
 
 // Cria um ficheiro para um novo jogo
 void create_game(int plid, const char *secret_code, int max_time, char mode) {
@@ -25,23 +46,38 @@ void create_game(int plid, const char *secret_code, int max_time, char mode) {
     }
 
     // Obter data e hora atual
-    time_t now = time(NULL);
-    struct tm *start_time = localtime(&now);
+    time_t now;
+    struct tm *start_time;
+    char time_str[20];
 
-    char date[11], time_str[9];
-    strftime(date, sizeof(date), "%Y-%m-%d", start_time);   // Formato: YYYY-MM-DD
-    strftime(time_str, sizeof(time_str), "%H:%M:%S", start_time); // Formato: HH:MM:SS
+
+    printf("vai obter hora\n");
+    time(&now);
+    printf("hora obtida\n");
+    printf("vai obter hora gmt\n");
+    start_time = gmtime(&now);
+    printf("hora gmt obtida\n");
+
+    // Formatar data e hora juntas: YYYY-MM-DD HH:MM:SS
+    snprintf(time_str, sizeof(time_str), "%4d-%02d-%02d %02d:%02d:%02d",
+             start_time->tm_year + 1900, 
+             start_time->tm_mon + 1,    
+             start_time->tm_mday,       
+             start_time->tm_hour,       
+             start_time->tm_min,        
+             start_time->tm_sec); 
 
     // Escreve a linha inicial no ficheiro no formato correto
-    fprintf(file, "%06d %c %s %d %s %s %ld\n", 
+    fprintf(file, "%06d %c %s %d %s %ld\n", 
             plid,                          // PLID com 6 dígitos
             mode,                          // Modo: P (Play) ou D (Debug)
             secret_code,                   // Código secreto
             max_time,                      // Tempo máximo em segundos
-            date,                          // Data de início: YYYY-MM-DD
-            time_str,                      // Hora de início: HH:MM:SS
+            time_str,                      // Data e hora de início: YYYY-MM-DD HH:MM:SS
             now                            // Momento de início em segundos (timestamp)
     );
+
+    printf("escreveu no ficheiro\n");
 
     fclose(file);
 }

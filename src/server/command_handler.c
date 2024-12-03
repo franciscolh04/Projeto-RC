@@ -19,7 +19,7 @@ const char* handle_start(const char* request) {
     }
 
     // Verificar se o jogador já tem um jogo ativo
-    if (has_active_game(plid)) {
+    if (has_active_game(plid, FLAG_START)) {
         return "RSG NOK\n"; // O jogador já tem um jogo em andamento
     }
 
@@ -64,7 +64,7 @@ const char* handle_debug(const char* request) {
     // FALTA VERIFICAR AS CORES
 
     // Verificar se o jogador já tem um jogo ativo
-    if (has_active_game(plid)) {
+    if (has_active_game(plid, FLAG_START)) {
         return "RDB NOK\n"; // O jogador já tem um jogo em andamento
     }
 
@@ -88,7 +88,7 @@ const char* handle_quit(const char* request) {
     }
 
     // Verificar se o jogador tem um jogo ativo
-    if (!has_active_game(plid)) {
+    if (!has_active_game(plid, FLAG_END)) {
         return "RQT NOK\n";
     }
 
