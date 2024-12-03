@@ -14,13 +14,13 @@ int has_active_game(int plid, int flag) {
     FILE *file = fopen(filename, "r");
     if (!file) return 0; // Retorna 0 se o arquivo não existir ou não puder ser aberto
 
-    // QUIT
+    // TRY or QUT
     if (flag == 0) {
         fclose(file);
         return 1;
     }
 
-    // START
+    // SNG
     char buffer[256];
     int line_count = 0;
 
@@ -30,7 +30,7 @@ int has_active_game(int plid, int flag) {
     }
 
     fclose(file);
-    return line_count - 1; // Retorna 1 se houver mais de uma linha
+    return line_count - 1; // Retorna >0 se houver mais de uma linha
 }
 
 

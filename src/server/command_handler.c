@@ -36,15 +36,39 @@ const char* handle_start(const char* request) {
 
 
 const char* handle_try(const char* request) {
-    // Parsing
-    // Verificar a sintaxe do comando - ERR 
-    // Ver se o jogador tem um jogo ativo - NOK
+    int plid, num_trials;
+    char c1[2], c2[2], c3[2], c4[2];
+    
+    // Verificar a sintaxe do comando - ERR
+    if (sscanf(request, "TRY %d %1s %1s %1s %1s %d\n", &plid, c1, c2, c3, c4, &num_trials) != 6) {
+        return "RTR ERR\n"; // Erro de sintaxe
+    }
+
+    // Verificar PLID e cores // FALTA VERIFICAR AS CORES
+    if (plid <= 0) {
+        return "RSG ERR\n";
+    }
+
+    // Verificar se o jogador tem um jogo ativo - NOK
+    if (!has_active_game(plid, FLAG_END)) {
+        return "RTR NOK\n";
+    }
+
     // Ver se o tempo de jogo foi excedido. Nesse caso, terminar o jogo - ETM (T)
+    // Chamar função que faz diferença de tempo ou fazer diretamente aqui?
+    // Fazer get_max_playtime() no state.c
+    // if get_start_time() + get_max_playtime() > time(): close_game(plid, max_playtime, 'T')
+
     // Consultar ficheiro de jogo e ver se número de trials está correto - INV
-    // Verificar se o jogador já esgotou todas as trials. Se sim, terminar o jogo - ENT (F)
+    // Fazer get_trial_number(plid)
+    // if get_trial_number(plid) != num_trials: return RTR INV
+
+    // Verificar se o jogador já esgotou todas as trials. Se sim, terminar o jogo - ENT (F) // ESTÁ NO SÍTIO CERTO???
+
     // Verificar se a tentativa é repetida - DUP
     // Verificar se é resend - OK (reenviar a resposta anterior)
     // Fazer jogada - OK
+    
     // Verificar se o jogo terminou - WIN. Se sim, terminar o jogo - (W)
 
     return "RTR OK\n";
