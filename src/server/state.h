@@ -3,8 +3,11 @@
 
 #include <time.h>
 
+#define FLAG_END 0
+#define FLAG_START 1
+
 // Funções relacionadas com jogos ativos
-int has_active_game(int plid); // Verifica se o jogador tem jogo ativo
+int has_active_game(int plid, int flag); // Verifica se o jogador tem jogo ativo
 void create_game(int plid, const char *secret_code, int max_time, char mode);
 void save_play(int plid, const char *attempt, int nB, int nW, int time_elapsed);
 int get_secret_code(int plid, char* secret_code);
