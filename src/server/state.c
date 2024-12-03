@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <errno.h>
 
-// Verifica se o jogador tem um jogo ativo
+// Verifica se o jogador tem um jogo ativo e devolve o número de trials do mesmo
 int has_active_game(int plid, int flag) {
     char filename[64];
     snprintf(filename, sizeof(filename), "%sGAME_%d.txt", GAMES_DIR, plid);
@@ -25,12 +25,12 @@ int has_active_game(int plid, int flag) {
     int line_count = 0;
 
     // Lê no máximo duas linhas
-    for (int i = 0; i < 2 && fgets(buffer, sizeof(buffer), file); i++) {
+    for (int i = 0; fgets(buffer, sizeof(buffer), file); i++) {
         line_count++;
     }
 
     fclose(file);
-    return line_count > 1; // Retorna 1 se houver mais de uma linha
+    return line_count - 1; // Retorna 1 se houver mais de uma linha
 }
 
 

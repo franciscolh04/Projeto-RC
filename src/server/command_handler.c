@@ -36,6 +36,17 @@ const char* handle_start(const char* request) {
 
 
 const char* handle_try(const char* request) {
+    // Parsing
+    // Verificar a sintaxe do comando - ERR 
+    // Ver se o jogador tem um jogo ativo - NOK
+    // Ver se o tempo de jogo foi excedido. Nesse caso, terminar o jogo - ETM (T)
+    // Consultar ficheiro de jogo e ver se número de trials está correto - INV
+    // Verificar se o jogador já esgotou todas as trials. Se sim, terminar o jogo - ENT (F)
+    // Verificar se a tentativa é repetida - DUP
+    // Verificar se é resend - OK (reenviar a resposta anterior)
+    // Fazer jogada - OK
+    // Verificar se o jogo terminou - WIN. Se sim, terminar o jogo - (W)
+
     return "RTR OK\n";
 }
 
