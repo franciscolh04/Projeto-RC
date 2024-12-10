@@ -3,44 +3,44 @@
 #include <time.h>
 #include <string.h>
 
-#define TOTAL_CORES 6
-#define TOTAL_SELECIONADAS 4
+#define TOTAL_COLORS 6
+#define CODE_SIZE 4
 
-// Função para criar e armazenar a lista de cores aleatórias
-void criarCoresAleatorias(const char *cores[], const char *selecionadas[]) {
+// Function to create and store the list of random colors
+void generateCode(const char *colors[], const char *selected[]) {
     int i;
-    // Inicializa o gerador de números aleatórios
+    // Initialize the random number generator
     srand(time(NULL));
 
-    // Escolhe aleatoriamente as cores
-    for (i = 0; i < TOTAL_SELECIONADAS; i++) {
-        int indice = rand() % TOTAL_CORES; // Gera um índice aleatório
-        selecionadas[i] = cores[indice];
+    // Randomly select the colors
+    for (i = 0; i < CODE_SIZE; i++) {
+        int index = rand() % TOTAL_COLORS; // Generate a random index
+        selected[i] = colors[index];
     }
 }
 
-// Função para verificar as cores fornecidas com a lista aleatória
-void verificarCores(const char *coresAleatorias[], const char *coresInput[], int *noLugarCerto, int *naLista) {
+// Function to check the provided colors against the random list
+void checkColors(const char *randomColors[], const char *inputColors[], int *correctPlace, int *inList) {
     int i, j;
-    *noLugarCerto = 0;
-    *naLista = 0;
-    int jaContada[TOTAL_SELECIONADAS] = {0}; // Marca as cores que já foram verificadas como "no lugar certo"
+    *correctPlace = 0;
+    *inList = 0;
+    int alreadyCounted[CODE_SIZE] = {0}; // Marks the colors that have already been counted as "in the correct place"
 
-    // Verifica as cores no lugar certo
-    for (i = 0; i < TOTAL_SELECIONADAS; i++) {
-        if (strcmp(coresInput[i], coresAleatorias[i]) == 0) {
-            (*noLugarCerto)++;
-            jaContada[i] = 1; // Marca que essa cor já foi contada como "no lugar certo"
+    // Check for colors in the correct place
+    for (i = 0; i < CODE_SIZE; i++) {
+        if (strcmp(inputColors[i], randomColors[i]) == 0) {
+            (*correctPlace)++;
+            alreadyCounted[i] = 1; // Mark that this color has been counted as "in the correct place"
         }
     }
 
-    // Verifica as cores que estão na lista, mas em posições diferentes
-    for (i = 0; i < TOTAL_SELECIONADAS; i++) {
-        if (!jaContada[i]) { // Só verifica se ainda não foi contada como "no lugar certo"
-            for (j = 0; j < TOTAL_CORES; j++) {
-                if (strcmp(coresInput[i], coresAleatorias[j]) == 0) {
-                    (*naLista)++;
-                    break; // Não precisa continuar verificando essa cor
+    // Check for colors that are in the list but in different positions
+    for (i = 0; i < CODE_SIZE; i++) {
+        if (!alreadyCounted[i]) { // Only check if it hasn't already been counted as "in the correct place"
+            for (j = 0; j < TOTAL_COLORS; j++) {
+                if (strcmp(inputColors[i], randomColors[j]) == 0) {
+                    (*inList)++;
+                    break; // No need to continue checking this color
                 }
             }
         }
@@ -48,33 +48,33 @@ void verificarCores(const char *coresAleatorias[], const char *coresInput[], int
 }
 
 int main() {
-    // Lista de cores com iniciais (R, G, B, Y, O, P)
-    const char *cores[TOTAL_CORES] = {"R", "G", "B", "Y", "O", "P"}; // R = Red, G = Green, B = Blue, Y = Yellow, O = Orange, P = Purple
+    // List of colors with initials (R, G, B, Y, O, P)
+    const char *colors[TOTAL_COLORS] = {"R", "G", "B", "Y", "O", "P"}; // R = Red, G = Green, B = Blue, Y = Yellow, O = Orange, P = Purple
     
-    // Lista para armazenar as cores aleatórias escolhidas
-    const char *coresAleatorias[TOTAL_SELECIONADAS];
+    // List to store the randomly selected colors
+    const char *randomColors[CODE_SIZE];
 
-    // Gera as cores aleatórias
-    criarCoresAleatorias(cores, coresAleatorias);
+    // Generate the random colors
+    generateCode(colors, randomColors);
 
-    // Exibe as cores aleatórias geradas
-    printf("Cores aleatórias selecionadas:\n");
-    for (int i = 0; i < TOTAL_SELECIONADAS; i++) {
-        printf("%s\n", coresAleatorias[i]);
+    // Display the selected random colors
+    printf("Randomly selected colors:\n");
+    for (int i = 0; i < CODE_SIZE; i++) {
+        printf("%s\n", randomColors[i]);
     }
 
-    // Exemplo de cores fornecidas pelo usuário
-    // (Aqui você pode modificar para receber a entrada real do usuário)
-    const char *coresInput[TOTAL_SELECIONADAS] = {"R", "B", "G", "P"}; // Exemplo de cores fornecidas
+    // Example of colors provided by the user
+    // (Here you can modify to receive actual user input)
+    const char *inputColors[CODE_SIZE] = {"R", "B", "G", "P"}; // Example of provided colors
 
-    int noLugarCerto, naLista;
+    int correctPlace, inList;
 
-    // Verifica as cores fornecidas
-    verificarCores(coresAleatorias, coresInput, &noLugarCerto, &naLista);
+    // Check the provided colors
+    checkColors(randomColors, inputColors, &correctPlace, &inList);
 
-    // Exibe os resultados
-    printf("\nCores no lugar certo: %d\n", noLugarCerto);
-    printf("Cores na lista, mas em lugar errado: %d\n", naLista);
+    // Display the results
+    printf("\nColors in the correct place: %d\n", correctPlace);
+    printf("Colors in the list but in the wrong place: %d\n", inList);
 
     return 0;
 }

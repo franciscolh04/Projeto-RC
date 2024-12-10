@@ -36,8 +36,9 @@ const char* handle_start(const char* request) {
 
 
 const char* handle_try(const char* request) {
-    int plid, num_trials;
-    char c1[2], c2[2], c3[2], c4[2];
+    int plid, num_trials, exp_num_trials;
+    char c1[2], c2[2], c3[2], c4[2], color_code[CODE_SIZE + 1], secret_code[CODE_SIZE + 1];
+    printf("entrou no handle_try\n");
     
     // Verificar a sintaxe do comando - ERR
     if (sscanf(request, "TRY %d %1s %1s %1s %1s %d\n", &plid, c1, c2, c3, c4, &num_trials) != 6) {
@@ -56,22 +57,60 @@ const char* handle_try(const char* request) {
 
     // Ver se o tempo de jogo foi excedido. Nesse caso, terminar o jogo - ETM (T)
     // Chamar função que faz diferença de tempo ou fazer diretamente aqui?
-    // Fazer get_max_playtime() no state.c
-    // if get_start_time() + get_max_playtime() > time(): close_game(plid, max_playtime, 'T')
+    time_t start_time, max_playtime, now;
+    get_start_time(plid, &start_time);
+    get_max_playtime(plid, &max_playtime);
 
-    // Consultar ficheiro de jogo e ver se número de trials está correto - INV
-    // Fazer get_trial_number(plid)
-    // if get_trial_number(plid) != num_trials: return RTR INV
+    if (time(&now) > start_time + max_playtime) {
+        close_game(plid, max_playtime, 'T');
+        return "RTR ETM\n";
+    }
 
-    // Verificar se o jogador já esgotou todas as trials. Se sim, terminar o jogo - ENT (F) // ESTÁ NO SÍTIO CERTO???
+    // Verificar se o número de trials é válido
+    exp_num_trials = has_active_game(plid, FLAG_START) + 1;
+    snprintf(color_code, sizeof(color_code), "%s%s%s%s", c1, c2, c3, c4);
+    printf("exp_num_trials: %d\n", exp_num_trials);
+    if (exp_num_trials != num_trials) {
+        if (check_trial(plid, color_code) == exp_num_trials - 1) {
+            // Obter nT, nB e nW do trial anterior
+            int nT, nB, nW;
+            static char response[13];
+            get_last_trial(plid, &nT, &nB, &nW);
+            snprintf(response, sizeof(response), "RTR OK %d %d %d\n", nT, nB, nW);
+            return response;
+        }
+        return "RTR INV\n"; // INV
+    }
 
-    // Verificar se a tentativa é repetida - DUP
-    // Verificar se é resend - OK (reenviar a resposta anterior)
+    // Verificar se a tentativa é repetida 
+    if (check_trial(plid, color_code) != 0) {
+        return "RTR DUP\n"; // DUP
+    }
+
     // Fazer jogada - OK
-    
-    // Verificar se o jogo terminou - WIN. Se sim, terminar o jogo - (W)
+    int nB, nW;
+    get_secret_code(plid, secret_code);
+    checkCode(secret_code, color_code, &nB, &nW);
+    save_play(plid, color_code, nB, nW, now - start_time);
 
-    return "RTR OK\n";
+
+    // Verificar se o jogo terminou - WIN. Se sim, terminar o jogo - (W)
+    static char response[13];
+    snprintf(response, sizeof(response), "RTR OK %d %d %d\n", num_trials, nB, nW); // OK
+    if (nB == CODE_SIZE) {
+        close_game(plid, now - start_time, 'W');
+        return response;
+    }
+
+    // Verificar se o jogador já esgotou todas as trials. Se sim, terminar o jogo - ENT (F)
+    if (num_trials == MAX_PLAYS) {
+        char response_with_code[16];
+        close_game(plid, now - start_time, 'F');
+        snprintf(response_with_code, sizeof(response_with_code), "RTR ENT %c %c %c %c\n", secret_code[0], secret_code[1], secret_code[2], secret_code[3]); // ENT
+        return response_with_code;
+    }
+    
+    return response;
 }
 
 const char* handle_show_trials(const char* request) {

@@ -1,4 +1,5 @@
 #include "state.h"
+#include "game.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -6,7 +7,7 @@
 #include <unistd.h>
 #include <errno.h>
 
-// Verifica se o jogador tem um jogo ativo e devolve o número de trials do mesmo
+// Verifica se o jogador tem um jogo ativo e, nesse caso, devolve o número de trials do mesmo
 int has_active_game(int plid, int flag) {
     char filename[64];
     snprintf(filename, sizeof(filename), "%sGAME_%d.txt", GAMES_DIR, plid);
@@ -24,7 +25,7 @@ int has_active_game(int plid, int flag) {
     char buffer[256];
     int line_count = 0;
 
-    // Lê no máximo duas linhas
+    // Conta o número de linhas no ficheiro
     for (int i = 0; fgets(buffer, sizeof(buffer), file); i++) {
         line_count++;
     }
@@ -72,10 +73,77 @@ void create_game(int plid, const char *secret_code, int max_time, char mode) {
             now                            // Momento de início em segundos (timestamp)
     );
 
-    printf("escreveu no ficheiro\n");
-
     fclose(file);
 }
+
+int check_trial(int plid, const char *attempt) {
+    char filename[64];
+    snprintf(filename, sizeof(filename), "%sGAME_%06d.txt", GAMES_DIR, plid);
+
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        perror("Erro ao abrir o ficheiro do jogo");
+        return 0; // Retorna 0 se o ficheiro não existir
+    }
+
+    char line[TRIAL_LINE_SIZE];
+    char trial_color_code[CODE_SIZE + 1];
+    int trial_counter = 0;
+
+    // Lê o ficheiro linha a linha para encontrar o trial correspondente
+    while (fgets(line, sizeof(line), file)) {
+        // Verifica se a linha começa com "T: " (indica um trial)
+        if (strncmp(line, "T: ", 3) == 0) {
+            trial_counter++; // Incrementa o número de trials processados
+
+            // Extrai o código de cores da linha
+            if (sscanf(line, "T: %4s", trial_color_code) == 1) {
+                if (strcmp(trial_color_code, attempt) == 0) {
+                    fclose(file);
+                    return trial_counter; // O trial foi encontrado
+                }
+            }
+        }
+    }
+
+    fclose(file);
+    return 0; // O trial não foi encontrado
+}
+
+int get_last_trial(int plid, int *nT, int *nB, int *nW) {
+    char filename[64];
+    snprintf(filename, sizeof(filename), "%sGAME_%06d.txt", GAMES_DIR, plid);
+
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        perror("Erro ao abrir o ficheiro do jogo");
+        return 0;
+    }
+
+    char line[TRIAL_LINE_SIZE];
+    char color_code[CODE_SIZE + 1];
+    int trial_counter = 0;
+    int found = 0;
+
+    // Percorre todas as linhas do ficheiro
+    while (fgets(line, sizeof(line), file)) {
+        // Verifica se a linha começa com "T: " (indica um trial)
+        if (strncmp(line, "T: ", 3) == 0) {
+            // Incrementa o número do trial
+            trial_counter++;
+
+            // Extrai os valores do trial atual
+            if (sscanf(line, "T: %4s %d %d %*d", color_code, nB, nW) == 3) {
+                found = 1; // Atualiza os valores encontrados
+            }
+        }
+    }
+
+    fclose(file);
+    *nT = trial_counter; // Atualiza o número do último trial
+    return found; // Retorna 1 se um trial foi encontrado, 0 caso contrário
+}
+
 
 // Regista uma jogada no ficheiro do jogo ativo
 void save_play(int plid, const char *attempt, int nB, int nW, int time_elapsed) {
@@ -89,7 +157,7 @@ void save_play(int plid, const char *attempt, int nB, int nW, int time_elapsed) 
     }
 
     // Escreve a jogada no formato: ATTEMPT nB nW TIME_ELAPSED
-    fprintf(file, "%s %d %d %d\n", attempt, nB, nW, time_elapsed);
+    fprintf(file, "T: %s %d %d %d\n", attempt, nB, nW, time_elapsed);
     fclose(file);
 }
 
@@ -131,6 +199,28 @@ int get_start_time(int plid, time_t* start_time) {
     }
 
     *start_time = (time_t)start_timestamp; // Converte o timestamp para time_t
+    fclose(file);
+    return 1; // Sucesso
+}
+
+int get_max_playtime(int plid, time_t* max_playtime) {
+    char filepath[128];
+    snprintf(filepath, sizeof(filepath), "%sGAME_%06d.txt", GAMES_DIR, plid);
+
+    FILE *file = fopen(filepath, "r");
+    if (file == NULL) {
+        perror("Erro ao abrir o ficheiro do jogo");
+        return 0; // Falha na leitura do ficheiro
+    }
+
+    // Lê a linha inicial do ficheiro no formato: PLID M CCCC T YYYY-MM-DD HH:MM:SS s
+    int playtime;
+    if (fscanf(file, "%*06d %*c %*4s %d", &playtime) != 1) {
+        fclose(file);
+        return 0; // Falha ao ler o tempo máximo
+    }
+
+    *max_playtime = playtime; // Converte o timestamp para time_t
     fclose(file);
     return 1; // Sucesso
 }

@@ -13,6 +13,6 @@ extern const char *colors[];
 void generateCode(char *selected);
 
 // Função para verificar as cores fornecidas com a lista aleatória
-void checkCode(const char *secretCode[], const char *inputCode[], int *nB, int *nW);
+void checkCode(char *secretCode, char *inputCode, int *nB, int *nW);
 
 #endif // GAME_H
