@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <errno.h>
+#include <dirent.h>
 
 // Verifica se o jogador tem um jogo ativo e, nesse caso, devolve o número de trials do mesmo
 int has_active_game(int plid, int flag) {
@@ -283,4 +284,127 @@ int close_game(int plid, int total_time, char end_code) {
     }
 
     return 1; // Sucesso
+}
+
+// Função para encontrar o último jogo de um jogador
+int FindLastGame(char *PLID, char *fname) {
+    struct dirent **filelist;
+    int n_entries, found = 0;
+    char dirname[GAMES_DIR_PATH_LEN + 7];
+
+    // Formatar o caminho do diretório do jogador
+    sprintf(dirname, "%s%s/", GAMES_DIR, PLID);
+
+    // Obter a lista de entradas do diretório
+    n_entries = scandir(dirname, &filelist, NULL, alphasort);
+    if (n_entries <= 0) {
+        return 0; // Diretório vazio ou não encontrado
+    }
+
+    // Percorrer as entradas do diretório de trás para frente
+    while (n_entries--) {
+        // Ignorar entradas que começam com '.'
+        if (filelist[n_entries]->d_name[0] != '.') {
+            // Formatar o caminho completo do ficheiro
+            sprintf(fname, "%s%s/%s", GAMES_DIR, PLID, filelist[n_entries]->d_name);
+            found = 1;
+        }
+        free(filelist[n_entries]); // Liberar a memória da entrada atual
+
+        if (found) {
+            break; // Encontrou o último jogo
+        }
+    }
+
+    free(filelist); // Liberar a memória da lista de entradas
+    return found; // Retorna 1 se encontrou, 0 caso contrário
+}
+
+
+// Função para formatar buffer com dados do jogo para o comando show_trials
+void format_show_trials(const char *plid, const char *fname, char *buffer, int game_status) {
+    FILE *file = fopen(fname, "r");
+    if (!file) {
+        snprintf(buffer, BUF_SIZE, "Error: Unable to open file for player %s\n", plid);
+        return;
+    }
+
+    char line[BUF_SIZE];
+    char lines_buffer[BUF_SIZE];
+    char game_mode, termination_mode, secret_code[CODE_SIZE + 1];
+    char start_date[20];
+    char end_date[20];
+    int max_time = 0, total_time = 0, num_trials = 0;
+    time_t start_time, end_time, now;
+
+    time(&now); // Obtém o tempo atual para cálculos.
+    snprintf(buffer, BUF_SIZE, ""); // Inicializa o buffer vazio.
+
+    // Processar a primeira linha do ficheiro (dados principais do jogo).
+    if (fgets(line, sizeof(line), file)) {
+        if (sscanf(line, "%s %c %4s %d %19[^\n] %ld", plid, &game_mode, secret_code, &max_time, start_date, &start_time) != 6) {
+            snprintf(buffer, BUF_SIZE, "Error: Invalid file format for player %s\n", plid);
+            fclose(file);
+            return;
+        }
+    }
+
+    // Formatar a saída inicial.
+    if (game_status == ACTIVE_GAME) {
+        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer),
+                 "Active game found for player %s\n", plid);
+    } else {
+        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer),
+                 "Last finalized game for player %s\n", plid);
+    }
+
+    snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer),
+             "Game initiated: %s with %d seconds to be completed\n",
+             start_date, max_time);
+
+    if (game_status == FINALIZED_GAME) {
+        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer),
+                 "Mode: %s  Secret code: %s\n", (game_mode == 'P') ? "PLAY" : "DEBUG", secret_code);
+    }
+
+    // Processar as linhas de trials.
+    snprintf(lines_buffer, BUF_SIZE, ""); // Inicializa o buffer vazio.
+    while (fgets(line, sizeof(line), file)) {
+        if (strncmp(line, "T: ", 3) == 0) {
+            num_trials++;
+            char trial_code[CODE_SIZE + 1];
+            int nB, nW, time_elapsed;
+            sscanf(line, "T: %4s %d %d %d", trial_code, &nB, &nW, &time_elapsed);
+            snprintf(lines_buffer + strlen(lines_buffer), BUF_SIZE - strlen(lines_buffer),
+                     "Trial: %s, nB: %d, nW: %d   %ds\n", trial_code, nB, nW, time_elapsed);
+        } else {
+            sscanf(line, "%19[^\n] %d", end_date, &total_time);
+        }
+    }
+    printf("lines_buffer: %s\n", lines_buffer);
+
+    if (num_trials == 0) {
+        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer),
+                 "\nGame started - no transactions found\n");
+    } else {
+        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer),
+             "\n     --- Transactions found: %d ---\n", num_trials);
+        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "%s", lines_buffer);
+    }
+
+    // Informações finais sobre o jogo.
+    if (game_status == ACTIVE_GAME) {
+        int remaining_time = max_time - (int)difftime(now, start_time);
+        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer),
+                 "\n-- %d seconds remaining to be completed --\n", remaining_time);
+    } else {
+        termination_mode = *(strrchr(fname, '_') + 1);
+        printf("termination_mode: %c\n", termination_mode);
+        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer),
+                 "\nTermination: %s at %s, Duration: %ds\n",
+                 (termination_mode == 'W') ? "WIN" : ((termination_mode == 'F') ? "FAIL" : ((termination_mode == 'Q') ? "QUIT" : "TIMEOUT")),
+                 end_date, total_time);
+    }
+
+    fclose(file);
 }

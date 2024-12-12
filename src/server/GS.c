@@ -14,7 +14,6 @@
 
 #define DEFAULT_PORT "58000"
 #define GN 0
-#define BUF_SIZE 1024
 
 // Funções para configurar os sockets e lidar com os pedidos
 int setup_udp_socket(const char *port);

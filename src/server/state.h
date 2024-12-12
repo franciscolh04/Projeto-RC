@@ -3,8 +3,14 @@
 
 #include <time.h>
 
+#define BUF_SIZE 1024
+
 #define FLAG_END 0
 #define FLAG_START 1
+
+#define FINALIZED_GAME 0
+#define ACTIVE_GAME 1
+
 #define TRIAL_LINE_SIZE 17
 
 // Funções relacionadas com jogos ativos
@@ -17,9 +23,12 @@ int get_secret_code(int plid, char* secret_code);
 int get_start_time(int plid, time_t* start_time);
 int get_max_playtime(int plid, time_t* max_playtime);
 int close_game(int plid, int total_time, char end_code);
+int FindLastGame(char *PLID, char *fname);
+void format_show_trials(const char *plid, const char *fname, char *buffer, int game_status);
 
 // Diretórios
 #define GAMES_DIR "./src/server/GAMES/"
 #define SCORES_DIR "./src/server/SCORES/"
+#define GAMES_DIR_PATH_LEN 20
 
 #endif // STATE_H

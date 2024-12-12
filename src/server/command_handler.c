@@ -63,7 +63,7 @@ const char* handle_try(const char* request) {
 
     if (time(&now) > start_time + max_playtime) {
         close_game(plid, max_playtime, 'T');
-        return "RTR ETM\n";
+        return "RTR ETM\n"; // CORRIGIR
     }
 
     // Verificar se o número de trials é válido
@@ -94,7 +94,7 @@ const char* handle_try(const char* request) {
     save_play(plid, color_code, nB, nW, now - start_time);
 
 
-    // Verificar se o jogo terminou - WIN. Se sim, terminar o jogo - (W)
+    // Verificar se o jogador ganhou - Se sim, terminar o jogo - (W)
     static char response[13];
     snprintf(response, sizeof(response), "RTR OK %d %d %d\n", num_trials, nB, nW); // OK
     if (nB == CODE_SIZE) {
@@ -104,17 +104,57 @@ const char* handle_try(const char* request) {
 
     // Verificar se o jogador já esgotou todas as trials. Se sim, terminar o jogo - ENT (F)
     if (num_trials == MAX_PLAYS) {
-        char response_with_code[16];
+        static char response_fail[16];
         close_game(plid, now - start_time, 'F');
-        snprintf(response_with_code, sizeof(response_with_code), "RTR ENT %c %c %c %c\n", secret_code[0], secret_code[1], secret_code[2], secret_code[3]); // ENT
-        return response_with_code;
+        snprintf(response_fail, sizeof(response_fail), "RTR ENT %c %c %c %c\n", secret_code[0], secret_code[1], secret_code[2], secret_code[3]); // ENT
+        return response_fail;
     }
     
     return response;
 }
 
 const char* handle_show_trials(const char* request) {
-    return "RST OK\n";
+    int plid;
+    static char response[BUF_SIZE];
+    char buffer[BUF_SIZE];
+    char fname[64], PLID[7];
+    size_t buffer_size;
+
+    // Verificar a sintaxe do comando
+    if (sscanf(request, "STR %d", &plid) != 1) {
+        return "RST NOK\n"; // Erro de sintaxe
+    }
+
+    // Verificar o número de PLID
+    if (plid <= 0) { // FALTAM COISAS
+        return "RST NOK\n";
+    }
+
+    // Format PLID como string com 6 dígitos
+    snprintf(PLID, sizeof(PLID), "%06d", plid);
+
+    // Determinar o ficheiro correspondente (ativo ou terminado)
+    if (has_active_game(plid, FLAG_END)) {
+        // Jogo ativo
+        snprintf(fname, sizeof(fname), "%sGAME_%s.txt", GAMES_DIR, PLID);
+        format_show_trials(PLID, fname, buffer, ACTIVE_GAME); // Formata os dados do jogo ativo
+        printf("buffer: %s\n", buffer);
+        // Formatar a resposta
+        buffer_size = strlen(buffer);
+        snprintf(response, sizeof(response), "RST ACT STATE_%s %ld %s\n", PLID, buffer_size, buffer);
+    } else {
+        // Último jogo terminado
+        if (FindLastGame(PLID, fname) == 0) {
+            return "RST NOK\n"; // Nenhum jogo encontrado
+        }
+        format_show_trials(PLID, fname, buffer, FINALIZED_GAME); // Formata os dados do último jogo terminado
+        printf("buffer: %s\n", buffer);
+        // Formatar a resposta
+        buffer_size = strlen(buffer);
+        snprintf(response, sizeof(response), "RST FIN STATE_%s %ld %s\n", PLID, buffer_size, buffer);
+    }
+
+    return response;
 }
 
 const char* handle_scoreboard() {
