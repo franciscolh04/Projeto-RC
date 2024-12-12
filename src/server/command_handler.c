@@ -141,7 +141,7 @@ const char* handle_show_trials(const char* request) {
         printf("buffer: %s\n", buffer);
         // Formatar a resposta
         buffer_size = strlen(buffer);
-        snprintf(response, sizeof(response), "RST ACT STATE_%s %ld %s\n", PLID, buffer_size, buffer);
+        snprintf(response, sizeof(response), "RST ACT STATE_%s.txt %ld\n%s\n", PLID, buffer_size, buffer);
     } else {
         // Último jogo terminado
         if (FindLastGame(PLID, fname) == 0) {
@@ -151,7 +151,7 @@ const char* handle_show_trials(const char* request) {
         printf("buffer: %s\n", buffer);
         // Formatar a resposta
         buffer_size = strlen(buffer);
-        snprintf(response, sizeof(response), "RST FIN STATE_%s %ld %s\n", PLID, buffer_size, buffer);
+        snprintf(response, sizeof(response), "RST FIN STATE_%s.txt %ld\n%s\n", PLID, buffer_size, buffer);
     }
 
     return response;
