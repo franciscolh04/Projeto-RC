@@ -256,6 +256,7 @@ void interpret_server_response(const char *response) {
     if (sscanf(response, "RSG %s\n", status) == 1) {
         if (strcmp(status, "OK") == 0) {
             printf("New game started (max %d sec)\n", MAX_PLAYTIME);
+            NUM_TRIALS = 1;
         } else if (strcmp(status, "NOK") == 0) {
             printf("The player has an ongoing game\n");
         } else if (strcmp(status, "ERR") == 0) {
@@ -299,6 +300,7 @@ void interpret_server_response(const char *response) {
     } else if (sscanf(response, "RDB %s", status) == 1) {
         if (strcmp(status, "OK") == 0) {
             printf("New game started (max %d sec)\n", MAX_PLAYTIME);
+            NUM_TRIALS = 1;
         } else if (strcmp(status, "NOK") == 0) {
             printf("The player has an ongoing game\n");
         } else if (strcmp(status, "ERR") == 0) {
@@ -316,7 +318,7 @@ void interpret_server_response(const char *response) {
     // RSS
     } else if (sscanf(response, "RSS %s %s %d", status, filename, &filesize) >= 1) {
         if (strcmp(status, "EMPTY") == 0) {
-            printf("vazio\n");
+            printf("Scoreboard vazia. Ainda não foi ganho nenhum jogo.\n");
         } else if (strcmp(status, "OK") == 0) {
             if (!save_file(response, filename, filesize)) {
                 printf("Erro ao guardar o ficheiro '%s'.\n", filename);

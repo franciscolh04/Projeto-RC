@@ -6,24 +6,30 @@
 #include <string.h>
 
 const char* handle_start(const char* request) {
-    int plid, time;
+    int plid, playtime;
 
     // Verificar a sintaxe do comando
-    if (sscanf(request, "SNG %d %d", &plid, &time) != 2) {
+    if (sscanf(request, "SNG %d %d", &plid, &playtime) != 2) {
         return "RSG ERR\n"; // Erro de sintaxe
     }
 
     // Verificar PLID e tempo
-    if (plid <= 0 || time < 0 || time > 600) {
+    if (plid <= 0 || playtime < 0 || playtime > 600) {
         return "RSG ERR\n";
     }
 
     // Verificar se o jogador já tem um jogo ativo
     if (has_active_game(plid, FLAG_START)) {
-        // Verificar se o tempo já passou. Se sim, terminar o jogo
+        // Verificar se o tempo já passou. Se sim, terminar o jogo ativo
+        time_t start_time, max_playtime, now;
+        get_start_time(plid, &start_time);
+        get_max_playtime(plid, &max_playtime);
 
-        // Caso contrário, responder com NOK
-        return "RSG NOK\n"; // O jogador já tem um jogo em andamento
+        if (time(&now) > start_time + max_playtime) {
+            close_game(plid, max_playtime, 'T');
+        } else { // Caso contrário, responder com NOK
+            return "RSG NOK\n"; // O jogador já tem um jogo em andamento
+        }
     }
 
     // Criar o código secreto para o novo jogo
@@ -31,7 +37,7 @@ const char* handle_start(const char* request) {
     generateCode(secret_code);
 
     // Criar o ficheiro de jogo
-    create_game(plid, secret_code, time, 'P');
+    create_game(plid, secret_code, playtime, 'P');
 
     // Responder com sucesso
     return "RSG OK\n";
@@ -70,7 +76,7 @@ const char* handle_try(const char* request) {
         get_secret_code(plid, secret_code);
         sprintf(response, "RTR ETM %c %c %c %c\n", secret_code[0], secret_code[1], secret_code[2], secret_code[3]);
         close_game(plid, max_playtime, 'T');
-        
+
         return response;
     }
 
@@ -199,16 +205,16 @@ const char* handle_scoreboard() {
 }
 
 const char* handle_debug(const char* request) {
-    int plid, time;
+    int plid, playtime;
     char c1[2], c2[2], c3[2], c4[2];
 
     // Verificar a sintaxe do comando
-    if (sscanf(request, "DBG %d %d %1s %1s %1s %1s", &plid, &time, c1, c2, c3, c4) != 6) {
+    if (sscanf(request, "DBG %d %d %1s %1s %1s %1s", &plid, &playtime, c1, c2, c3, c4) != 6) {
         return "RDB ERR\n"; // Erro de sintaxe
     }
 
     // Verificar PLID e tempo
-    if (plid <= 0 || time < 0 || time > 600) {
+    if (plid <= 0 || playtime < 0 || playtime > 600) {
         return "RDB ERR\n";
     }
 
@@ -216,10 +222,16 @@ const char* handle_debug(const char* request) {
 
     // Verificar se o jogador já tem um jogo ativo
     if (has_active_game(plid, FLAG_START)) {
-        // Verificar se o tempo já passou. Se sim, terminar o jogo
+        // Verificar se o tempo já passou. Se sim, terminar o jogo ativo
+        time_t start_time, max_playtime, now;
+        get_start_time(plid, &start_time);
+        get_max_playtime(plid, &max_playtime);
 
-        // Caso contrário, responder com NOK
-        return "RDB NOK\n"; // O jogador já tem um jogo em andamento
+        if (time(&now) > start_time + max_playtime) {
+            close_game(plid, max_playtime, 'T');
+        } else { // Caso contrário, responder com NOK
+            return "RDB NOK\n"; // O jogador já tem um jogo em andamento
+        }
     }
 
     // Associa o código secreto fornecido ao novo jogo
@@ -227,7 +239,7 @@ const char* handle_debug(const char* request) {
     snprintf(secret_code, sizeof(secret_code), "%c%c%c%c", c1[0], c2[0], c3[0], c4[0]);
 
     // Criar o ficheiro de jogo
-    create_game(plid, secret_code, time, 'D');
+    create_game(plid, secret_code, playtime, 'D');
 
     // Responder com sucesso
     return "RDB OK\n";
