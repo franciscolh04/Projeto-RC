@@ -20,7 +20,7 @@ all: $(GS_EXEC) $(PLAYER_EXEC)
 
 # Compilar o GS
 $(GS_EXEC): $(SERVER_OBJS)
-	$(CC) $(CFLAGS) -o $(GS_EXEC) $(SERVER_OBJS)
+	$(CC) $(CFLAGS) -o $(GS_EXEC) $(SERVER_OBJS) -lm
 
 # Compilar o player
 $(PLAYER_EXEC): $(PLAYER_OBJS)

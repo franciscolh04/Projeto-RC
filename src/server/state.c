@@ -293,12 +293,20 @@ int close_game(int plid, int total_time, char end_code) {
         return 0; // Falha ao abrir o ficheiro
     }
 
-    // Obter data e hora atual
-    time_t now;
+    // Obter data e hora de fim de jogo
     struct tm *end_time;
 
-    time(&now);
-    end_time = gmtime(&now);
+    if (end_code == 'T') {
+        time_t start_time, max_playtime, final_time;
+        get_start_time(plid, &start_time);
+        get_max_playtime(plid, &max_playtime);
+        final_time = start_time + max_playtime;
+        end_time = gmtime(&final_time);
+    } else {
+        time_t now;
+        time(&now);
+        end_time = gmtime(&now);
+    }
 
     // Formatar data e hora juntas: YYYY-MM-DD HH:MM:SS
     snprintf(time_str, sizeof(time_str), "%4d-%02d-%02d %02d:%02d:%02d",

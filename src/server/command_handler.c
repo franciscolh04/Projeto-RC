@@ -65,8 +65,13 @@ const char* handle_try(const char* request) {
     get_max_playtime(plid, &max_playtime);
 
     if (time(&now) > start_time + max_playtime) {
+        char response[17];
+
+        get_secret_code(plid, secret_code);
+        sprintf(response, "RTR ETM %c %c %c %c\n", secret_code[0], secret_code[1], secret_code[2], secret_code[3]);
         close_game(plid, max_playtime, 'T');
-        return "RTR ETM\n"; // CORRIGIR
+        
+        return response;
     }
 
     // Verificar se o número de trials é válido
@@ -77,7 +82,7 @@ const char* handle_try(const char* request) {
         if (check_trial(plid, color_code) == exp_num_trials - 1) {
             // Obter nT, nB e nW do trial anterior
             int nT, nB, nW;
-            static char response[13];
+            static char response[14];
             get_last_trial(plid, &nT, &nB, &nW);
             snprintf(response, sizeof(response), "RTR OK %d %d %d\n", nT, nB, nW);
             return response;
@@ -98,7 +103,7 @@ const char* handle_try(const char* request) {
 
 
     // Verificar se o jogador ganhou - Se sim, terminar o jogo - (W)
-    static char response[13];
+    static char response[14];
     snprintf(response, sizeof(response), "RTR OK %d %d %d\n", num_trials, nB, nW); // OK
     if (nB == CODE_SIZE) {
         int score = 100;
