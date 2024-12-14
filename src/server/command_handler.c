@@ -127,8 +127,8 @@ const char* handle_try(const char* request) {
 
 const char* handle_show_trials(const char* request) {
     int plid;
-    static char response[BUF_SIZE];
     char buffer[BUF_SIZE];
+    static char response[BUF_SIZE];
     char fname[64], PLID[7];
     size_t buffer_size;
 
@@ -170,7 +170,27 @@ const char* handle_show_trials(const char* request) {
 }
 
 const char* handle_scoreboard() {
-    return "RSS OK\n";
+    SCORELIST list;
+    char buffer[BUF_SIZE];
+    static char response[BUF_SIZE];
+    size_t buffer_size;
+    time_t now;
+    time(&now);
+    struct tm *start_time;
+    start_time = gmtime(&now);
+
+    if (FindTopScores(&list) == 0) {
+        return "RSS EMPTY\n"; // Nenhum score encontrado
+    }
+
+    // Formatar a resposta e retornar
+    snprintf(buffer, BUF_SIZE, ""); // Inicializa o buffer vazio.
+    format_scoreboard(&list, buffer);
+    printf("buffer: %s\n", buffer);
+    buffer_size = strlen(buffer);
+    snprintf(response, sizeof(response), "RSS OK TOPSCORES_%ld.txt %ld\n%s\n", now, buffer_size, buffer);
+
+    return response;
 }
 
 const char* handle_debug(const char* request) {

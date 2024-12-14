@@ -351,7 +351,7 @@ int FindLastGame(char *PLID, char *fname) {
     sprintf(dirname, "%s%s/", GAMES_DIR, PLID);
 
     // Obter a lista de entradas do diretório
-    n_entries = scandir(dirname, &filelist, NULL, alphasort);
+    n_entries = scandir(dirname, &filelist, 0, alphasort);
     if (n_entries <= 0) {
         return 0; // Diretório vazio ou não encontrado
     }
@@ -376,14 +376,13 @@ int FindLastGame(char *PLID, char *fname) {
 }
 
 // Função para encontrar os 10 melhores scores
-/*
 int FindTopScores(SCORELIST *list) {
     struct dirent **filelist;
     int n_entries, i_file;
-    char fname[50];
+    char fname[SCORES_DIR_PATH_LEN + 31];
     FILE *fp;
 
-    n_entries = scandir("SCORES/", &filelist, 0, alphasort);
+    n_entries = scandir(SCORES_DIR, &filelist, 0, alphasort);
 
     i_file = 0;
     if (n_entries < 0) {
@@ -391,18 +390,19 @@ int FindTopScores(SCORELIST *list) {
     } else {
         while (n_entries--) {
             if (filelist[n_entries]->d_name[0] != '.') {
-                sprintf(fname, "SCORES/%s", filelist[n_entries]->d_name);
+                sprintf(fname, "%s%s", SCORES_DIR, filelist[n_entries]->d_name);
                 fp = fopen(fname, "r");
 
                 if (fp != NULL) {
+                    char mode[6];
                     fscanf(fp, "%d %s %s %d %s",
                         &list->score[i_file], list->PLID[i_file], list->col_code[i_file], &list->no_tries[i_file], mode);
                     
                     if (!strcmp(mode, "PLAY")) 
-                        list->mode[i_file] = MODEPLAY;
+                        list->mode[i_file] = MODE_PLAY;
                     
                     if (!strcmp(mode, "DEBUG")) 
-                        list->mode[i_file] = MODEDEBUG;
+                        list->mode[i_file] = MODE_DEBUG;
                     
                     fclose(fp);
                     ++i_file;
@@ -421,7 +421,6 @@ int FindTopScores(SCORELIST *list) {
     list->n_scores = i_file;
     return i_file;
 }
-*/
 
 
 // Função para formatar buffer com dados do jogo para o comando show_trials
@@ -510,4 +509,29 @@ void format_show_trials(const char *plid, const char *fname, char *buffer, int g
     }
 
     fclose(file);
+}
+
+// Função para formatar o buffer para a scoreboard
+void format_scoreboard(SCORELIST *list, char *buffer) {
+    // Formatar o cabeçalho com o número correto de scores
+    snprintf(buffer, 128, 
+             "----------------------------- TOP %d SCORES -----------------------------\n\n",
+             list->n_scores);
+
+    strcat(buffer, "                 SCORE PLAYER     CODE    NO TRIALS   MODE\n\n");
+
+    // Iterar sobre os scores e formatar cada linha
+    for (int i = 0; i < list->n_scores; i++) {
+        char line[128]; // Buffer para cada linha formatada
+        snprintf(line, sizeof(line), 
+                 "            %2d -  %3d  %-7s    %-4.4s        %d       %-5s\n",
+                 i + 1,                                // Posição na tabela
+                 list->score[i],                      // Score
+                 list->PLID[i],                       // Player ID
+                 list->col_code[i],                   // Código das cores
+                 list->no_tries[i],                   // Número de tentativas
+                 list->mode[i] == MODE_PLAY ? "PLAY" : "DEBUG" // Modo (PLAY ou DEBUG)
+        );
+        strcat(buffer, line); // Adicionar a linha ao buffer principal
+    }
 }

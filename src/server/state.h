@@ -3,6 +3,7 @@
 
 #include <time.h>
 #include <math.h>
+#include "game.h"
 
 #define BUF_SIZE 1024
 
@@ -12,7 +13,20 @@
 #define FINALIZED_GAME 0
 #define ACTIVE_GAME 1
 
+#define MODE_PLAY 0
+#define MODE_DEBUG 1
+
 #define TRIAL_LINE_SIZE 17
+#define SCOREBOAD_SIZE 10
+
+typedef struct {
+    int score[SCOREBOAD_SIZE];               // Scores dos jogadores
+    char PLID[SCOREBOAD_SIZE][7];   // IDs dos jogadores (strings)
+    char col_code[SCOREBOAD_SIZE][CODE_SIZE]; // Códigos das cores (strings)
+    int no_tries[SCOREBOAD_SIZE];            // Número de tentativas por jogador
+    int mode[SCOREBOAD_SIZE];                // Modo de jogo (PLAY ou DEBUG)
+    int n_scores;                        // Número total de scores armazenados
+} SCORELIST;
 
 // Funções relacionadas com jogos ativos
 int has_active_game(int plid, int flag); // Verifica se o jogador tem jogo ativo
@@ -27,7 +41,9 @@ int get_max_playtime(int plid, time_t* max_playtime);
 int get_game_mode(int plid, char* mode);
 int close_game(int plid, int total_time, char end_code);
 int FindLastGame(char *PLID, char *fname);
+int FindTopScores(SCORELIST *list);
 void format_show_trials(const char *plid, const char *fname, char *buffer, int game_status);
+void format_scoreboard(SCORELIST *list, char *buffer);
 
 // Diretórios
 #define GAMES_DIR "./src/server/GAMES/"
