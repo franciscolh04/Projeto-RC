@@ -20,6 +20,9 @@ const char* handle_start(const char* request) {
 
     // Verificar se o jogador já tem um jogo ativo
     if (has_active_game(plid, FLAG_START)) {
+        // Verificar se o tempo já passou. Se sim, terminar o jogo
+
+        // Caso contrário, responder com NOK
         return "RSG NOK\n"; // O jogador já tem um jogo em andamento
     }
 
@@ -98,6 +101,15 @@ const char* handle_try(const char* request) {
     static char response[13];
     snprintf(response, sizeof(response), "RTR OK %d %d %d\n", num_trials, nB, nW); // OK
     if (nB == CODE_SIZE) {
+        int score = 100;
+        char mode;
+        
+        score = (num_trials == MAX_PLAYS) ? 1 : 
+        (num_trials > 1 ? score - (int)floor(num_trials * (100.0 / MAX_PLAYS)) : score);
+
+        get_game_mode(plid, &mode);
+
+        save_score(plid, score, now, secret_code, num_trials, mode);
         close_game(plid, now - start_time, 'W');
         return response;
     }
@@ -179,6 +191,9 @@ const char* handle_debug(const char* request) {
 
     // Verificar se o jogador já tem um jogo ativo
     if (has_active_game(plid, FLAG_START)) {
+        // Verificar se o tempo já passou. Se sim, terminar o jogo
+
+        // Caso contrário, responder com NOK
         return "RDB NOK\n"; // O jogador já tem um jogo em andamento
     }
 

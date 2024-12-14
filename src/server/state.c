@@ -162,6 +162,41 @@ void save_play(int plid, const char *attempt, int nB, int nW, int time_elapsed) 
     fclose(file);
 }
 
+// Regista a pontuação de um jogador num dado jogo
+void save_score(int plid, int score, time_t now, const char *secret_code, int num_trials, char mode) {
+    char filename[SCORES_DIR_PATH_LEN + 31];
+    char time_str[20];
+
+    struct tm *end_time;
+    end_time = gmtime(&now);
+
+    // Formatar a data e hora de fim
+    snprintf(time_str, sizeof(time_str), "%02d%02d%4d_%02d%02d%02d",
+             end_time->tm_mday,       
+             end_time->tm_mon + 1,    
+             end_time->tm_year + 1900, 
+             end_time->tm_hour,       
+             end_time->tm_min,        
+             end_time->tm_sec);
+
+    // Formatar o nome do ficheiro: score_PLID_DDMMYYYY_HHMMSS.txt
+    snprintf(filename, sizeof(filename), "%s%03d_%06d_%s.txt", 
+             SCORES_DIR, score, plid, time_str);
+
+    // Criar e abrir o ficheiro para escrita
+    FILE *file = fopen(filename, "w");
+    if (!file) {
+        perror("Erro ao criar ficheiro de score");
+        exit(EXIT_FAILURE);
+    }
+
+    // Escrever a linha com os dados do score
+    fprintf(file, "%03d %06d %s %d %s\n", 
+            score, plid, secret_code, num_trials, (mode == 'P') ? "PLAY" : "DEBUG");
+
+    fclose(file);
+}
+
 int get_secret_code(int plid, char* secret_code) {
     char filepath[128];
     snprintf(filepath, sizeof(filepath), "%sGAME_%06d.txt", GAMES_DIR, plid); // Usa o GAMES_DIR definido
@@ -222,6 +257,26 @@ int get_max_playtime(int plid, time_t* max_playtime) {
     }
 
     *max_playtime = playtime; // Converte o timestamp para time_t
+    fclose(file);
+    return 1; // Sucesso
+}
+
+int get_game_mode(int plid, char* mode) {
+    char filepath[128];
+    snprintf(filepath, sizeof(filepath), "%sGAME_%06d.txt", GAMES_DIR, plid);
+
+    FILE *file = fopen(filepath, "r");
+    if (file == NULL) {
+        perror("Erro ao abrir o ficheiro do jogo");
+        return 0; // Falha na leitura do ficheiro
+    }
+
+    // Lê a linha inicial do ficheiro no formato: PLID M CCCC T YYYY-MM-DD HH:MM:SS s
+    if (fscanf(file, "%*06d %c", mode) != 1) {
+        fclose(file);
+        return 0; // Falha ao ler o modo de jogo
+    }
+
     fclose(file);
     return 1; // Sucesso
 }
@@ -319,6 +374,54 @@ int FindLastGame(char *PLID, char *fname) {
     free(filelist); // Liberar a memória da lista de entradas
     return found; // Retorna 1 se encontrou, 0 caso contrário
 }
+
+// Função para encontrar os 10 melhores scores
+/*
+int FindTopScores(SCORELIST *list) {
+    struct dirent **filelist;
+    int n_entries, i_file;
+    char fname[50];
+    FILE *fp;
+
+    n_entries = scandir("SCORES/", &filelist, 0, alphasort);
+
+    i_file = 0;
+    if (n_entries < 0) {
+        return (0);
+    } else {
+        while (n_entries--) {
+            if (filelist[n_entries]->d_name[0] != '.') {
+                sprintf(fname, "SCORES/%s", filelist[n_entries]->d_name);
+                fp = fopen(fname, "r");
+
+                if (fp != NULL) {
+                    fscanf(fp, "%d %s %s %d %s",
+                        &list->score[i_file], list->PLID[i_file], list->col_code[i_file], &list->no_tries[i_file], mode);
+                    
+                    if (!strcmp(mode, "PLAY")) 
+                        list->mode[i_file] = MODEPLAY;
+                    
+                    if (!strcmp(mode, "DEBUG")) 
+                        list->mode[i_file] = MODEDEBUG;
+                    
+                    fclose(fp);
+                    ++i_file;
+                }
+            }
+
+            free(filelist[n_entries]);
+
+            if (i_file == 10)
+                break;
+        }
+
+        free(filelist);
+    }
+
+    list->n_scores = i_file;
+    return i_file;
+}
+*/
 
 
 // Função para formatar buffer com dados do jogo para o comando show_trials
