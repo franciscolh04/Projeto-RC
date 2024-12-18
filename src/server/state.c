@@ -580,24 +580,13 @@ void format_scoreboard(SCORELIST *list, char *buffer) {
     // Iterar sobre os scores e formatar cada linha.
     for (int i = 0; i < list->n_scores && i < 10; i++) { // Máximo de 10 linhas.
         char line[128]; // Buffer para cada linha formatada.
-
-        if (i == list->n_scores - 1 || i == 9) {
-            snprintf(line, sizeof(line), 
-                     "%-6s %4.4s %d",       // Sem '\n' no final.
-                     list->PLID[i],         // Player ID.
-                     list->col_code[i],     // Código das cores (chave secreta).
-                     list->no_tries[i]      // Número de tentativas.
-            );
-        } else {
-            // Formatar a linha com PLID, código secreto e número de tentativas.
-            snprintf(line, sizeof(line), 
-                    "%-6s %4.4s %d\n",      // Separar os campos por espaços, com '\n' no final.
-                    list->PLID[i],          // Player ID.
-                    list->col_code[i],      // Código das cores (chave secreta).
-                    list->no_tries[i]       // Número de tentativas.
-            );
-        }
-
+        // Formatar a linha com PLID, código secreto e número de tentativas.
+        snprintf(line, sizeof(line), 
+                "%-6s %4.4s %d\n",      // Separar os campos por espaços, com '\n' no final.
+                list->PLID[i],          // Player ID.
+                list->col_code[i],      // Código das cores (chave secreta).
+                list->no_tries[i]       // Número de tentativas.
+        );
         strcat(buffer, line); // Adicionar a linha ao buffer principal.
     }
 }
