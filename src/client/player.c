@@ -11,7 +11,7 @@
 #define GN 0
 #define BUF_SIZE 1024
 
-int PLID = -1;
+char PLID[7] = ""; // PLID definido como char com espaço para 6 caracteres + terminador nulo
 int MAX_PLAYTIME = 0;
 int NUM_TRIALS = 1;
 int EXIT = 0;
@@ -27,7 +27,6 @@ void process_command(const char *input, char *formatted_command, char *protocol)
 
 // Função para interpretar a resposta do servidor
 void interpret_server_response(const char *response);
-
 
 int main(int argc, char *argv[]) {
     int port = DEFAULT_PORT + GN;
@@ -103,25 +102,20 @@ int save_file(const char *response, const char *filename, int filesize) {
         return 0;
     }
 
-    // Encontra o início dos dados do ficheiro no buffer
-    const char *file_data = strchr(response, '\n'); // Localiza o primeiro '\n' (fim da linha do cabeçalho)
-    if (!file_data) {
-        printf("Erro: Cabeçalho mal formatado na resposta.\n");
-        fclose(file);
-        return 0;
+    // Encontrar o início dos dados Fdata no buffer response
+    const char *file_data = response;
+
+    // Saltar o cabeçalho "RST status Fname Fsize"
+    for(int i = 0; i < 4; i++) {  
+        file_data = strchr(file_data, ' '); // Salta até acabar o cabeçalho
+        if (!file_data) { fclose(file); return 0; }
     }
-    file_data += 1; // Avança para depois do '\n'
+    
 
-    // Calcula o comprimento dos dados (tamanho da resposta - posição após o cabeçalho)
-    int data_len = strlen(file_data); // Calcula o comprimento da string a partir da posição atual dos dados
+    // Avançar para além do espaço para chegar ao início de Fdata
+    file_data++;
 
-    if (data_len < filesize) {
-        printf("Erro: Dados do ficheiro incompletos na resposta (%d/%d bytes).\n", data_len, filesize);
-        fclose(file);
-        return 0;
-    }
-
-    // Escreve os dados no ficheiro em loop
+    // Escrever os dados no ficheiro
     int bytes_written = 0;
     while (bytes_written < filesize) {
         int chunk_size = fwrite(file_data + bytes_written, 1, filesize - bytes_written, file);
@@ -248,7 +242,7 @@ int send_tcp_message(struct sockaddr_in *server_addr, char *server_ip, int port,
 // Interpretar a resposta do servidor
 void interpret_server_response(const char *response) {
     printf("Resposta do servidor: %s\n", response);
-    char command[BUF_SIZE], status[BUF_SIZE], filename[BUF_SIZE];
+    char status[BUF_SIZE], filename[BUF_SIZE];
     char c1[2], c2[2], c3[2], c4[2];
     int filesize, nB, nW;
 
@@ -330,23 +324,21 @@ void interpret_server_response(const char *response) {
     }
 }
 
-
 void process_command(const char *input, char *formatted_command, char *protocol) {
-    char command[BUF_SIZE];
     char c1[2], c2[2], c3[2], c4[2];
 
     // Análise do comando e definição do protocolo
-    if (sscanf(input, "start %d %d", &PLID, &MAX_PLAYTIME) == 2) {
-        snprintf(formatted_command, BUF_SIZE, "SNG %d %d\n", PLID, MAX_PLAYTIME);
+    if (sscanf(input, "start %6s %d", PLID, &MAX_PLAYTIME) == 2) {
+        snprintf(formatted_command, BUF_SIZE, "SNG %s %d\n", PLID, MAX_PLAYTIME);
         *protocol = 'U';  // UDP para o comando "start"
     } 
     // Adicionar outras condições conforme os outros comandos
     else if (sscanf(input, "try %1s %1s %1s %1s", c1, c2, c3, c4) == 4) {
-        snprintf(formatted_command, BUF_SIZE, "TRY %d %s %s %s %s %d\n", PLID, c1, c2, c3, c4, NUM_TRIALS);
+        snprintf(formatted_command, BUF_SIZE, "TRY %s %s %s %s %s %d\n", PLID, c1, c2, c3, c4, NUM_TRIALS);
         *protocol = 'U';  // UDP para o comando "try"
     }
     else if (strcmp(input, "show_trials") == 0 || strcmp(input, "st") == 0) {
-        snprintf(formatted_command, BUF_SIZE, "STR %d\n", PLID);
+        snprintf(formatted_command, BUF_SIZE, "STR %s\n", PLID);
         *protocol = 'T';  // TCP para o comando "show_trials"
     }
     else if (strcmp(input, "scoreboard") == 0 || strcmp(input, "sb") == 0) {
@@ -356,21 +348,23 @@ void process_command(const char *input, char *formatted_command, char *protocol)
     else if (strcmp(input, "quit") == 0) {
         NUM_TRIALS = 1;
         MAX_PLAYTIME = 0;
-        snprintf(formatted_command, BUF_SIZE, "QUT %d\n", PLID);
+        snprintf(formatted_command, BUF_SIZE, "QUT %s\n", PLID);
         *protocol = 'U';  // UDP para o comando "quit"
     }
     else if (strcmp(input, "exit") == 0) {
         NUM_TRIALS = 1;
         MAX_PLAYTIME = 0;
-        snprintf(formatted_command, BUF_SIZE, "QUT %d\n", PLID);
+        snprintf(formatted_command, BUF_SIZE, "QUT %s\n", PLID);
         *protocol = 'U';  // UDP para o comando "exit"
         EXIT = 1;
     }
-    else if (sscanf(input, "debug %d %d %1s %1s %1s %1s", &PLID, &MAX_PLAYTIME, c1, c2, c3, c4) == 6) {
-        snprintf(formatted_command, BUF_SIZE, "DBG %d %d %s %s %s %s\n", PLID, MAX_PLAYTIME, c1, c2, c3, c4);
+    else if (sscanf(input, "debug %6s %d %1s %1s %1s %1s", PLID, &MAX_PLAYTIME, c1, c2, c3, c4) == 6) {
+        snprintf(formatted_command, BUF_SIZE, "DBG %s %d %s %s %s %s\n", PLID, MAX_PLAYTIME, c1, c2, c3, c4);
         *protocol = 'U';  // UDP para o comando "debug"
     }
     else {
         *protocol = 'X';  // X indica um comando não reconhecido
     }
 }
+
+

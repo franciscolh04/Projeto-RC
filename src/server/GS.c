@@ -8,12 +8,14 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <sys/wait.h>
+#include "GS.h"
 #include "state.h"
 #include "command_handler.h"
 
 
 #define DEFAULT_PORT "58000"
 #define GN 0
+int VERBOSE = 0;
 
 // Funções para configurar os sockets e lidar com os pedidos
 int setup_udp_socket(const char *port);
@@ -31,7 +33,7 @@ int main(int argc, char *argv[]) {
     char port[6];
     snprintf(port, sizeof(port), "%d", port_num);
 
-    int opt, verbose = 0;
+    int opt;
 
     // Processar argumentos
     while ((opt = getopt(argc, argv, "p:v")) != -1) {
@@ -40,7 +42,7 @@ int main(int argc, char *argv[]) {
                 snprintf(port, sizeof(port), "%s", optarg);
                 break;
             case 'v':
-                verbose = 1;
+                VERBOSE = 1;
                 break;
             default:
                 fprintf(stderr, "Uso: %s [-p GSport] [-v]\n", argv[0]);
@@ -71,7 +73,6 @@ int main(int argc, char *argv[]) {
         // Processar UDP (no processo pai)
         if (FD_ISSET(server_socket_udp, &read_fds)) {
             struct sockaddr_in client_addr;
-            socklen_t client_len = sizeof(client_addr);
             handle_udp_request(server_socket_udp, client_addr);
         }
 
@@ -233,7 +234,7 @@ void handle_tcp_request(int client_sockfd) {
 
     // Chama a função para interpretar a mensagem
     const char *response = interpret_player_request(buffer);
-
+    
     // Envia a resposta ao cliente
     while (total_written < strlen(response)) {
         n = write(client_sockfd, response + total_written, strlen(response) - total_written);

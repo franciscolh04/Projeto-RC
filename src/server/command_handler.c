@@ -1,20 +1,23 @@
 #include "command_handler.h"
 #include "state.h"
 #include "game.h"
+#include "GS.h"
+#include "./../common/verifications.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 const char* handle_start(const char* request) {
-    int plid, playtime;
+    char plid[7]; // Alterado de int para char[7]
+    int playtime;
 
     // Verificar a sintaxe do comando
-    if (sscanf(request, "SNG %d %d", &plid, &playtime) != 2) {
+    if (sscanf(request, "SNG %6s %d", plid, &playtime) != 2) {
         return "RSG ERR\n"; // Erro de sintaxe
     }
 
     // Verificar PLID e tempo
-    if (plid <= 0 || playtime < 0 || playtime > 600) {
+    if (atoi(plid) <= 0 || playtime < 0 || playtime > 600) {
         return "RSG ERR\n";
     }
 
@@ -26,8 +29,14 @@ const char* handle_start(const char* request) {
         get_max_playtime(plid, &max_playtime);
 
         if (time(&now) > start_time + max_playtime) {
+            if (VERBOSE) {
+                printf("PLID=%s: TIMEOUT (game ended)\n", plid);
+            }
             close_game(plid, max_playtime, 'T');
         } else { // Caso contrário, responder com NOK
+            if (VERBOSE) {
+                printf("PLID=%s, player already has an active game\n", plid);
+            }
             return "RSG NOK\n"; // O jogador já tem um jogo em andamento
         }
     }
@@ -39,51 +48,62 @@ const char* handle_start(const char* request) {
     // Criar o ficheiro de jogo
     create_game(plid, secret_code, playtime, 'P');
 
+    
+    if (VERBOSE) {
+        printf("New game (max %d sec); Colors: %c %c %c %c\n", playtime, secret_code[0], secret_code[1], secret_code[2], secret_code[3]);
+    }
+
+
     // Responder com sucesso
     return "RSG OK\n";
 }
 
-
 const char* handle_try(const char* request) {
-    int plid, num_trials, exp_num_trials;
+    char plid[7]; // Alterado de int para char[7]
+    int num_trials, exp_num_trials;
     char c1[2], c2[2], c3[2], c4[2], color_code[CODE_SIZE + 1], secret_code[CODE_SIZE + 1];
-    printf("entrou no handle_try\n");
+
     
     // Verificar a sintaxe do comando - ERR
-    if (sscanf(request, "TRY %d %1s %1s %1s %1s %d\n", &plid, c1, c2, c3, c4, &num_trials) != 6) {
+    if (sscanf(request, "TRY %s %1s %1s %1s %1s %d\n", plid, c1, c2, c3, c4, &num_trials) != 6) {
         return "RTR ERR\n"; // Erro de sintaxe
     }
 
     // Verificar PLID e cores // FALTA VERIFICAR AS CORES
-    if (plid <= 0) {
-        return "RSG ERR\n";
+    snprintf(color_code, sizeof(color_code), "%s%s%s%s", c1, c2, c3, c4);
+    if (atoi(plid) <= 0 || valid_colors(color_code) == 0) {
+        return "RTR ERR\n";
     }
 
     // Verificar se o jogador tem um jogo ativo - NOK
     if (!has_active_game(plid, FLAG_END)) {
+        if (VERBOSE) {
+            printf("PLID=%s, player doesn't have an active game\n", plid);
+        }
         return "RTR NOK\n";
     }
 
+
     // Ver se o tempo de jogo foi excedido. Nesse caso, terminar o jogo - ETM (T)
-    // Chamar função que faz diferença de tempo ou fazer diretamente aqui?
     time_t start_time, max_playtime, now;
     get_start_time(plid, &start_time);
     get_max_playtime(plid, &max_playtime);
 
     if (time(&now) > start_time + max_playtime) {
-        char response[17];
+        static char response[17];
 
         get_secret_code(plid, secret_code);
+        
         sprintf(response, "RTR ETM %c %c %c %c\n", secret_code[0], secret_code[1], secret_code[2], secret_code[3]);
         close_game(plid, max_playtime, 'T');
-
+        if (VERBOSE) {
+            printf("PLID=%s, TIMEOUT (game ended)\n", plid);
+        }
         return response;
     }
 
     // Verificar se o número de trials é válido
     exp_num_trials = has_active_game(plid, FLAG_START) + 1;
-    snprintf(color_code, sizeof(color_code), "%s%s%s%s", c1, c2, c3, c4);
-    printf("exp_num_trials: %d\n", exp_num_trials);
     if (exp_num_trials != num_trials) {
         if (check_trial(plid, color_code) == exp_num_trials - 1) {
             // Obter nT, nB e nW do trial anterior
@@ -91,22 +111,29 @@ const char* handle_try(const char* request) {
             static char response[14];
             get_last_trial(plid, &nT, &nB, &nW);
             snprintf(response, sizeof(response), "RTR OK %d %d %d\n", nT, nB, nW);
+            if (VERBOSE) {
+                printf("PLID=%s: try %c %c %c %c - nB = %d, nW = %d; Not guessed\n",plid, color_code[0], color_code[1], color_code[2], color_code[3], nB, nW);
+            }
             return response;
+        }
+        if (VERBOSE) {
+            printf("PLID=%s, wrong expected number of trials\n", plid);
         }
         return "RTR INV\n"; // INV
     }
 
     // Verificar se a tentativa é repetida 
     if (check_trial(plid, color_code) != 0) {
+        if (VERBOSE) {
+            printf("PLID=%s, alredy guessed try %c %c %c %c\n", plid, color_code[0], color_code[1], color_code[2], color_code[3]);
+        }
         return "RTR DUP\n"; // DUP
     }
-
     // Fazer jogada - OK
     int nB, nW;
     get_secret_code(plid, secret_code);
     checkCode(secret_code, color_code, &nB, &nW);
     save_play(plid, color_code, nB, nW, now - start_time);
-
 
     // Verificar se o jogador ganhou - Se sim, terminar o jogo - (W)
     static char response[14];
@@ -122,6 +149,10 @@ const char* handle_try(const char* request) {
 
         save_score(plid, score, now, secret_code, num_trials, mode);
         close_game(plid, now - start_time, 'W');
+
+        if (VERBOSE) {
+            printf("PLID=%s, try %c %c %c %c - nB = %d, nW = %d: WIN (game ended)\n", plid, color_code[0], color_code[1], color_code[2], color_code[3], nB, nW);
+        }
         return response;
     }
 
@@ -130,55 +161,80 @@ const char* handle_try(const char* request) {
         static char response_fail[16];
         close_game(plid, now - start_time, 'F');
         snprintf(response_fail, sizeof(response_fail), "RTR ENT %c %c %c %c\n", secret_code[0], secret_code[1], secret_code[2], secret_code[3]); // ENT
+        if (VERBOSE) {
+            printf("PLID=%s, try %c %c %c %c - nB = %d, nW = %d: FAIL (game ended)\n", plid, color_code[0], color_code[1], color_code[2], color_code[3], nB, nW);
+        }
         return response_fail;
     }
-    
+
+    if (VERBOSE) {
+        printf("vai fazer verbose\n");
+        printf("PLID=%s: try %c %c %c %c - nB = %d, nW = %d; Not guessed\n",plid, color_code[0], color_code[1], color_code[2], color_code[3], nB, nW);
+    }
+
     return response;
 }
 
 const char* handle_show_trials(const char* request) {
-    int plid;
+    char plid[7]; // Alterado de int para char[7]
     char buffer[BUF_SIZE];
     static char response[BUF_SIZE];
-    char fname[64], PLID[7];
+    char fname[64];
     size_t buffer_size;
 
     // Verificar a sintaxe do comando
-    if (sscanf(request, "STR %d", &plid) != 1) {
+    if (sscanf(request, "STR %s", plid) != 1) {
+        if (VERBOSE) {
+            printf("PLID=%s, player tried to start a new game, but already has an active game\n", plid);
+        }
         return "RST NOK\n"; // Erro de sintaxe
     }
 
     // Verificar o número de PLID
-    if (plid <= 0) { // FALTAM COISAS
+    if (atoi(plid) <= 0) { // FALTAM COISAS
         return "RST NOK\n";
     }
 
-    // Format PLID como string com 6 dígitos
-    snprintf(PLID, sizeof(PLID), "%06d", plid);
-
     // Determinar o ficheiro correspondente (ativo ou terminado)
     if (has_active_game(plid, FLAG_END)) {
-        // Jogo ativo
-        snprintf(fname, sizeof(fname), "%sGAME_%s.txt", GAMES_DIR, PLID);
-        format_show_trials(PLID, fname, buffer, ACTIVE_GAME); // Formata os dados do jogo ativo
-        printf("buffer: %s\n", buffer);
-        // Formatar a resposta
+        snprintf(fname, sizeof(fname), "%sGAME_%s.txt", GAMES_DIR, plid);
+
+        // Verificar se o tempo já passou. Se sim, terminar o jogo ativo
+        time_t start_time, max_playtime, now;
+        get_start_time(plid, &start_time);
+        get_max_playtime(plid, &max_playtime);
+
+        if (time(&now) > start_time + max_playtime) {
+            format_show_trials(plid, fname, buffer, FINALIZED_GAME); // Formata os dados como jogo terminado
+            if (VERBOSE) {
+                printf("PLID=%s: TIMEOUT (game ended)\n", plid);
+            }
+            close_game(plid, max_playtime, 'T'); // Termina o jogo
+        } else { 
+            // Jogo ativo
+            format_show_trials(plid, fname, buffer, ACTIVE_GAME); // Formata os dados como jogo ativo
+        }
         buffer_size = strlen(buffer);
-        snprintf(response, sizeof(response), "RST ACT STATE_%s.txt %ld\n%s\n", PLID, buffer_size, buffer);
+        snprintf(response, sizeof(response), "RST ACT STATE_%s.txt %ld %s\n", plid, buffer_size, buffer);
     } else {
         // Último jogo terminado
-        if (FindLastGame(PLID, fname) == 0) {
+        if (FindLastGame(plid, fname) == 0) {
+            if (VERBOSE) {
+                printf("PLID=%s, player doesn't have an active game\n", plid);
+            }
             return "RST NOK\n"; // Nenhum jogo encontrado
         }
-        format_show_trials(PLID, fname, buffer, FINALIZED_GAME); // Formata os dados do último jogo terminado
-        printf("buffer: %s\n", buffer);
-        // Formatar a resposta
+        format_show_trials(plid, fname, buffer, FINALIZED_GAME); // Formata os dados do último jogo terminado
         buffer_size = strlen(buffer);
-        snprintf(response, sizeof(response), "RST FIN STATE_%s.txt %ld\n%s\n", PLID, buffer_size, buffer);
+        snprintf(response, sizeof(response), "RST FIN STATE_%s.txt %ld %s\n", plid, buffer_size, buffer);
+    }
+    if (VERBOSE) {
+        printf("PLID=%s: show trials: \"%s\" (%ld bytes)\n", plid, fname, buffer_size);
     }
 
     return response;
 }
+
 
 const char* handle_scoreboard() {
     SCORELIST list;
@@ -187,34 +243,39 @@ const char* handle_scoreboard() {
     size_t buffer_size;
     time_t now;
     time(&now);
-    struct tm *start_time;
-    start_time = gmtime(&now);
 
     if (FindTopScores(&list) == 0) {
+        if (VERBOSE) {
+            printf("No scores found\n");
+        }
         return "RSS EMPTY\n"; // Nenhum score encontrado
     }
 
     // Formatar a resposta e retornar
     snprintf(buffer, BUF_SIZE, ""); // Inicializa o buffer vazio.
     format_scoreboard(&list, buffer);
-    printf("buffer: %s\n", buffer);
     buffer_size = strlen(buffer);
-    snprintf(response, sizeof(response), "RSS OK TOPSCORES_%ld.txt %ld\n%s\n", now, buffer_size, buffer);
+    snprintf(response, sizeof(response), "RSS OK TOPSCORES_%ld.txt %ld %s\n", now, buffer_size, buffer);
+
+    if (VERBOSE) {
+        printf("Send scoreboard file \"TOPSCORES_%ld.txt\" (%ld bytes)\n", now, buffer_size);
+    }
 
     return response;
 }
 
 const char* handle_debug(const char* request) {
-    int plid, playtime;
+    char plid[7]; // Alterado de int para char[7]
+    int playtime;
     char c1[2], c2[2], c3[2], c4[2];
 
     // Verificar a sintaxe do comando
-    if (sscanf(request, "DBG %d %d %1s %1s %1s %1s", &plid, &playtime, c1, c2, c3, c4) != 6) {
+    if (sscanf(request, "DBG %s %d %1s %1s %1s %1s", plid, &playtime, c1, c2, c3, c4) != 6) {
         return "RDB ERR\n"; // Erro de sintaxe
     }
 
     // Verificar PLID e tempo
-    if (plid <= 0 || playtime < 0 || playtime > 600) {
+    if (atoi(plid) <= 0 || playtime < 0 || playtime > 600) {
         return "RDB ERR\n";
     }
 
@@ -228,8 +289,14 @@ const char* handle_debug(const char* request) {
         get_max_playtime(plid, &max_playtime);
 
         if (time(&now) > start_time + max_playtime) {
+            if (VERBOSE) {
+                printf("PLID=%s: time out (game ended)\n", plid);
+            }
             close_game(plid, max_playtime, 'T');
         } else { // Caso contrário, responder com NOK
+            if (VERBOSE) {
+                printf("PLID=%s: player already has an active game\n", plid);
+            }
             return "RDB NOK\n"; // O jogador já tem um jogo em andamento
         }
     }
@@ -241,20 +308,27 @@ const char* handle_debug(const char* request) {
     // Criar o ficheiro de jogo
     create_game(plid, secret_code, playtime, 'D');
 
+    if (VERBOSE) {
+        printf("New game (max %d sec); Colors: %c %c %c %c\n", playtime, secret_code[0], secret_code[1], secret_code[2], secret_code[3]);
+    }
+
     // Responder com sucesso
     return "RDB OK\n";
 }
 
 const char* handle_quit(const char* request) {
-    int plid;
+    char plid[7]; // Alterado de int para char[7]
 
     // Verificar a sintaxe do comando
-    if (sscanf(request, "QUT %d", &plid) != 1) {
+    if (sscanf(request, "QUT %6s", plid) != 1) {
         return "RQT ERR\n"; // Erro de sintaxe
     }
 
     // Verificar se o jogador tem um jogo ativo
     if (!has_active_game(plid, FLAG_END)) {
+        if (VERBOSE) {
+            printf("PLID=%s: player doesn't have an active game\n", plid);
+        }
         return "RQT NOK\n";
     }
 
@@ -286,8 +360,8 @@ const char* handle_quit(const char* request) {
              secret_code[1], 
              secret_code[2], 
              secret_code[3]);
-
+    if (VERBOSE) {
+        printf("PLID=%s: QUIT (game ended)\n", plid);
+    }
     return response;
 }
-
-

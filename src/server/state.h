@@ -29,17 +29,17 @@ typedef struct {
 } SCORELIST;
 
 // Funções relacionadas com jogos ativos
-int has_active_game(int plid, int flag); // Verifica se o jogador tem jogo ativo
-void create_game(int plid, const char *secret_code, int max_time, char mode);
-int check_trial(int plid, const char *attempt);
-int get_last_trial(int plid, int *nT, int *nB, int *nW);
-void save_play(int plid, const char *attempt, int nB, int nW, int time_elapsed);
-void save_score(int plid, int score, time_t end_time, const char *secret_code, int num_plays, char mode);
-int get_secret_code(int plid, char* secret_code);
-int get_start_time(int plid, time_t* start_time);
-int get_max_playtime(int plid, time_t* max_playtime);
-int get_game_mode(int plid, char* mode);
-int close_game(int plid, int total_time, char end_code);
+int has_active_game(char *plid, int flag); // Verifica se o jogador tem jogo ativo
+void create_game(char *plid, const char *secret_code, int max_time, char mode);
+int check_trial(char *plid, const char *attempt);
+int get_last_trial(char *plid, int *nT, int *nB, int *nW);
+void save_play(char *plid, const char *attempt, int nB, int nW, int time_elapsed);
+void save_score(char *plid, int score, time_t end_time, const char *secret_code, int num_plays, char mode);
+int get_secret_code(char *plid, char* secret_code);
+int get_start_time(char *plid, time_t* start_time);
+int get_max_playtime(char *plid, time_t* max_playtime);
+int get_game_mode(char *plid, char* mode);
+int close_game(char *plid, int total_time, char end_code);
 int FindLastGame(char *PLID, char *fname);
 int FindTopScores(SCORELIST *list);
 void format_show_trials(const char *plid, const char *fname, char *buffer, int game_status);

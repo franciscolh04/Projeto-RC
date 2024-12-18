@@ -15,6 +15,7 @@ void generateCode(char *selected) {
         int index = rand() % TOTAL_COLORS; // Gera um índice aleatório
         selected[i] = colors[index][0]; // Armazenar o primeiro caractere de cada cor
     }
+    selected[CODE_SIZE] = '\0'; // Termina a string
 }
 
 

@@ -9,13 +9,13 @@
 #include <dirent.h>
 
 // Verifica se o jogador tem um jogo ativo e, nesse caso, devolve o número de trials do mesmo
-int has_active_game(int plid, int flag) {
+int has_active_game(char *plid, int flag) {
     char filename[64];
-    snprintf(filename, sizeof(filename), "%sGAME_%d.txt", GAMES_DIR, plid);
+    snprintf(filename, sizeof(filename), "%sGAME_%s.txt", GAMES_DIR, plid);
 
     FILE *file = fopen(filename, "r");
     if (!file) return 0; // Retorna 0 se o arquivo não existir ou não puder ser aberto
-
+    
     // TRY or QUT
     if (flag == 0) {
         fclose(file);
@@ -37,9 +37,9 @@ int has_active_game(int plid, int flag) {
 
 
 // Cria um ficheiro para um novo jogo
-void create_game(int plid, const char *secret_code, int max_time, char mode) {
+void create_game(char *plid, const char *secret_code, int max_time, char mode) {
     char filename[64];
-    snprintf(filename, sizeof(filename), "%sGAME_%06d.txt", GAMES_DIR, plid);
+    snprintf(filename, sizeof(filename), "%sGAME_%s.txt", GAMES_DIR, plid);
 
     FILE *file = fopen(filename, "w");
     if (!file) {
@@ -65,7 +65,7 @@ void create_game(int plid, const char *secret_code, int max_time, char mode) {
              start_time->tm_sec); 
 
     // Escreve a linha inicial no ficheiro no formato correto
-    fprintf(file, "%06d %c %s %d %s %ld\n", 
+    fprintf(file, "%s %c %s %d %s %ld\n", 
             plid,                          // PLID com 6 dígitos
             mode,                          // Modo: P (Play) ou D (Debug)
             secret_code,                   // Código secreto
@@ -77,9 +77,9 @@ void create_game(int plid, const char *secret_code, int max_time, char mode) {
     fclose(file);
 }
 
-int check_trial(int plid, const char *attempt) {
+int check_trial(char *plid, const char *attempt) {
     char filename[64];
-    snprintf(filename, sizeof(filename), "%sGAME_%06d.txt", GAMES_DIR, plid);
+    snprintf(filename, sizeof(filename), "%sGAME_%s.txt", GAMES_DIR, plid);
 
     FILE *file = fopen(filename, "r");
     if (!file) {
@@ -111,9 +111,9 @@ int check_trial(int plid, const char *attempt) {
     return 0; // O trial não foi encontrado
 }
 
-int get_last_trial(int plid, int *nT, int *nB, int *nW) {
+int get_last_trial(char *plid, int *nT, int *nB, int *nW) {
     char filename[64];
-    snprintf(filename, sizeof(filename), "%sGAME_%06d.txt", GAMES_DIR, plid);
+    snprintf(filename, sizeof(filename), "%sGAME_%s.txt", GAMES_DIR, plid);
 
     FILE *file = fopen(filename, "r");
     if (!file) {
@@ -147,9 +147,9 @@ int get_last_trial(int plid, int *nT, int *nB, int *nW) {
 
 
 // Regista uma jogada no ficheiro do jogo ativo
-void save_play(int plid, const char *attempt, int nB, int nW, int time_elapsed) {
+void save_play(char *plid, const char *attempt, int nB, int nW, int time_elapsed) {
     char filename[64];
-    snprintf(filename, sizeof(filename), "%sGAME_%d.txt", GAMES_DIR, plid);
+    snprintf(filename, sizeof(filename), "%sGAME_%s.txt", GAMES_DIR, plid);
 
     FILE *file = fopen(filename, "a");
     if (!file) {
@@ -163,7 +163,7 @@ void save_play(int plid, const char *attempt, int nB, int nW, int time_elapsed) 
 }
 
 // Regista a pontuação de um jogador num dado jogo
-void save_score(int plid, int score, time_t now, const char *secret_code, int num_trials, char mode) {
+void save_score(char *plid, int score, time_t now, const char *secret_code, int num_trials, char mode) {
     char filename[SCORES_DIR_PATH_LEN + 31];
     char time_str[20];
 
@@ -180,7 +180,7 @@ void save_score(int plid, int score, time_t now, const char *secret_code, int nu
              end_time->tm_sec);
 
     // Formatar o nome do ficheiro: score_PLID_DDMMYYYY_HHMMSS.txt
-    snprintf(filename, sizeof(filename), "%s%03d_%06d_%s.txt", 
+    snprintf(filename, sizeof(filename), "%s%03d_%s_%s.txt", 
              SCORES_DIR, score, plid, time_str);
 
     // Criar e abrir o ficheiro para escrita
@@ -191,24 +191,24 @@ void save_score(int plid, int score, time_t now, const char *secret_code, int nu
     }
 
     // Escrever a linha com os dados do score
-    fprintf(file, "%03d %06d %s %d %s\n", 
+    fprintf(file, "%03d %s %s %d %s\n", 
             score, plid, secret_code, num_trials, (mode == 'P') ? "PLAY" : "DEBUG");
 
     fclose(file);
 }
 
-int get_secret_code(int plid, char* secret_code) {
+int get_secret_code(char *plid, char* secret_code) {
     char filepath[128];
-    snprintf(filepath, sizeof(filepath), "%sGAME_%06d.txt", GAMES_DIR, plid); // Usa o GAMES_DIR definido
+    snprintf(filepath, sizeof(filepath), "%sGAME_%s.txt", GAMES_DIR, plid); // Usa o GAMES_DIR definido
 
     FILE *file = fopen(filepath, "r");
     if (file == NULL) {
         perror("Erro ao abrir o ficheiro do jogo");
         return 0; // Falha na leitura do ficheiro
     }
-
+  
     // Lê a primeira linha do ficheiro e extrai o código secreto
-    if (fscanf(file, "%*06d %*c %4s", secret_code) != 1) { // Ignora PLID e Modo, lê o código secreto
+    if (fscanf(file, "%*s %*c %4s", secret_code) != 1) { // Ignora PLID e Modo, lê o código secreto
         fclose(file);
         return 0; // Falha ao ler o código secreto
     }
@@ -217,11 +217,12 @@ int get_secret_code(int plid, char* secret_code) {
     return 1; // Sucesso
 }
 
-int get_start_time(int plid, time_t* start_time) {
+int get_start_time(char *plid, time_t* start_time) {
     char filepath[128];
-    snprintf(filepath, sizeof(filepath), "%sGAME_%06d.txt", GAMES_DIR, plid);
+    snprintf(filepath, sizeof(filepath), "%sGAME_%s.txt", GAMES_DIR, plid);
 
     FILE *file = fopen(filepath, "r");
+
     if (file == NULL) {
         perror("Erro ao abrir o ficheiro do jogo");
         return 0; // Falha na leitura do ficheiro
@@ -229,7 +230,7 @@ int get_start_time(int plid, time_t* start_time) {
 
     // Lê a linha inicial do ficheiro no formato: PLID M CCCC T YYYY-MM-DD HH:MM:SS s
     long start_timestamp;
-    if (fscanf(file, "%*06d %*c %*4s %*d %*s %*s %ld", &start_timestamp) != 1) {
+    if (fscanf(file, "%*6s %*c %*4s %*d %*s %*s %ld", &start_timestamp) != 1) {
         fclose(file);
         return 0; // Falha ao ler o timestamp
     }
@@ -239,10 +240,9 @@ int get_start_time(int plid, time_t* start_time) {
     return 1; // Sucesso
 }
 
-int get_max_playtime(int plid, time_t* max_playtime) {
+int get_max_playtime(char *plid, time_t* max_playtime) {
     char filepath[128];
-    snprintf(filepath, sizeof(filepath), "%sGAME_%06d.txt", GAMES_DIR, plid);
-
+    snprintf(filepath, sizeof(filepath), "%sGAME_%s.txt", GAMES_DIR, plid);
     FILE *file = fopen(filepath, "r");
     if (file == NULL) {
         perror("Erro ao abrir o ficheiro do jogo");
@@ -251,7 +251,7 @@ int get_max_playtime(int plid, time_t* max_playtime) {
 
     // Lê a linha inicial do ficheiro no formato: PLID M CCCC T YYYY-MM-DD HH:MM:SS s
     int playtime;
-    if (fscanf(file, "%*06d %*c %*4s %d", &playtime) != 1) {
+    if (fscanf(file, "%*6s %*c %*4s %d", &playtime) != 1) {
         fclose(file);
         return 0; // Falha ao ler o tempo máximo
     }
@@ -261,9 +261,9 @@ int get_max_playtime(int plid, time_t* max_playtime) {
     return 1; // Sucesso
 }
 
-int get_game_mode(int plid, char* mode) {
+int get_game_mode(char *plid, char* mode) {
     char filepath[128];
-    snprintf(filepath, sizeof(filepath), "%sGAME_%06d.txt", GAMES_DIR, plid);
+    snprintf(filepath, sizeof(filepath), "%sGAME_%s.txt", GAMES_DIR, plid);
 
     FILE *file = fopen(filepath, "r");
     if (file == NULL) {
@@ -272,7 +272,7 @@ int get_game_mode(int plid, char* mode) {
     }
 
     // Lê a linha inicial do ficheiro no formato: PLID M CCCC T YYYY-MM-DD HH:MM:SS s
-    if (fscanf(file, "%*06d %c", mode) != 1) {
+    if (fscanf(file, "%*6s %c", mode) != 1) {
         fclose(file);
         return 0; // Falha ao ler o modo de jogo
     }
@@ -282,9 +282,9 @@ int get_game_mode(int plid, char* mode) {
 }
 
 // Fecha o jogo e move o ficheiro para o diretório do jogador
-int close_game(int plid, int total_time, char end_code) {
+int close_game(char *plid, int total_time, char end_code) {
     char filename[64], new_filename[128], player_dir[64], time_str[20];
-    snprintf(filename, sizeof(filename), "%sGAME_%06d.txt", GAMES_DIR, plid);
+    snprintf(filename, sizeof(filename), "%sGAME_%s.txt", GAMES_DIR, plid);
 
     // Abre o ficheiro do jogo ativo para adicionar as informações de encerramento
     FILE *file = fopen(filename, "a");
@@ -322,7 +322,7 @@ int close_game(int plid, int total_time, char end_code) {
     fclose(file);
 
     // Criar o diretório do jogador (se não existir)
-    snprintf(player_dir, sizeof(player_dir), "%s%d", GAMES_DIR, plid);
+    snprintf(player_dir, sizeof(player_dir), "%s%s", GAMES_DIR, plid);
     if (mkdir(player_dir, 0755) != 0 && errno != EEXIST) {
         perror("Erro ao criar diretório do jogador");
         return 0; // Falha ao criar o diretório
@@ -337,7 +337,7 @@ int close_game(int plid, int total_time, char end_code) {
              end_time->tm_min,        
              end_time->tm_sec);
 
-    snprintf(new_filename, sizeof(new_filename), "%s%d/%s_%c.txt", 
+    snprintf(new_filename, sizeof(new_filename), "%s%s/%s_%c.txt", 
              GAMES_DIR, plid, time_str, end_code);
 
     // Move o ficheiro para o diretório final
@@ -440,6 +440,59 @@ void format_show_trials(const char *plid, const char *fname, char *buffer, int g
     }
 
     char line[BUF_SIZE];
+
+    int max_time = 0;
+    time_t start_time, now;
+
+    buffer[0] = '\0'; // Inicializa o buffer vazio.
+
+    // Lê a linha inicial do ficheiro (metadados do jogo).
+    if (!fgets(line, sizeof(line), file) || sscanf(line, "%*6s %*c %*4s %d %*19[^\n] %ld", &max_time, &start_time) != 2) {
+        snprintf(buffer, BUF_SIZE, "Error: Invalid file format for player %s\n", plid);
+        fclose(file);
+        return;
+    }
+
+
+    // Processar as linhas de tentativas.
+    while (fgets(line, sizeof(line), file)) {
+        if (strncmp(line, "T: ", 3) == 0) {
+            int nB, nW;
+            char trial_code[CODE_SIZE + 1];
+            // Linha de tentativa
+            if (sscanf(line, "T: %4s %d %d %*d", trial_code, &nB, &nW) == 3) {
+                snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer),
+                         "%c %c %c %c %d %d\n",
+                         trial_code[0], trial_code[1], trial_code[2], trial_code[3], nB, nW);
+            }
+        }
+    }
+
+    // Calcular o tempo restante para jogos ativos.
+    if (game_status == ACTIVE_GAME) {
+        time(&now); // Obtém o tempo atual.
+        int remaining_time = max_time - (int)difftime(now, start_time);
+        printf("remaining_time: %d\n", remaining_time);
+        if (remaining_time < 0) {
+            remaining_time = 0; // Evita valores negativos.
+        }
+        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "%d\n", remaining_time);
+    } else if (game_status == FINALIZED_GAME) {
+        snprintf(buffer + strlen(buffer), BUF_SIZE - strlen(buffer), "Game ended\n");
+    }
+
+    fclose(file);
+}
+
+/*
+void format_show_trials(const char *plid, const char *fname, char *buffer, int game_status) {
+    FILE *file = fopen(fname, "r");
+    if (!file) {
+        snprintf(buffer, BUF_SIZE, "Error: Unable to open file for player %s\n", plid);
+        return;
+    }
+
+    char line[BUF_SIZE];
     char lines_buffer[BUF_SIZE];
     char game_mode, termination_mode, secret_code[CODE_SIZE + 1];
     char start_date[20];
@@ -518,8 +571,38 @@ void format_show_trials(const char *plid, const char *fname, char *buffer, int g
 
     fclose(file);
 }
+*/
 
 // Função para formatar o buffer para a scoreboard
+void format_scoreboard(SCORELIST *list, char *buffer) {
+    buffer[0] = '\0'; // Inicializar o buffer como vazio.
+
+    // Iterar sobre os scores e formatar cada linha.
+    for (int i = 0; i < list->n_scores && i < 10; i++) { // Máximo de 10 linhas.
+        char line[128]; // Buffer para cada linha formatada.
+
+        if (i == list->n_scores - 1 || i == 9) {
+            snprintf(line, sizeof(line), 
+                     "%-6s %4.4s %d",       // Sem '\n' no final.
+                     list->PLID[i],         // Player ID.
+                     list->col_code[i],     // Código das cores (chave secreta).
+                     list->no_tries[i]      // Número de tentativas.
+            );
+        } else {
+            // Formatar a linha com PLID, código secreto e número de tentativas.
+            snprintf(line, sizeof(line), 
+                    "%-6s %4.4s %d\n",      // Separar os campos por espaços, com '\n' no final.
+                    list->PLID[i],          // Player ID.
+                    list->col_code[i],      // Código das cores (chave secreta).
+                    list->no_tries[i]       // Número de tentativas.
+            );
+        }
+
+        strcat(buffer, line); // Adicionar a linha ao buffer principal.
+    }
+}
+
+/*
 void format_scoreboard(SCORELIST *list, char *buffer) {
     // Formatar o cabeçalho com o número correto de scores
     snprintf(buffer, 128, 
@@ -541,5 +624,9 @@ void format_scoreboard(SCORELIST *list, char *buffer) {
                  list->mode[i] == MODE_PLAY ? "PLAY" : "DEBUG" // Modo (PLAY ou DEBUG)
         );
         strcat(buffer, line); // Adicionar a linha ao buffer principal
-    }
+    }   
 }
+*/
+
+
+
