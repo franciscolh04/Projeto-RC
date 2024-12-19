@@ -1,3 +1,4 @@
+#include "GS.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,28 +9,12 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <sys/wait.h>
-#include "GS.h"
-#include "state.h"
-#include "command_handler.h"
 
-
-#define DEFAULT_PORT "58000"
-#define GN 0
-int VERBOSE = 0;
-
-// Funções para configurar os sockets e lidar com os pedidos
-int setup_udp_socket(const char *port);
-int setup_tcp_socket(const char *port);
-void handle_udp_request(int sockfd, struct sockaddr_in client_addr);
-void handle_tcp_request(int client_sockfd);
-
-// Função para interpretar o pedido do cliente
-const char* interpret_player_request(const char *message);
-
+int VERBOSE = 0; // Variável global para ativar/desativar mensagens de debug
 
 int main(int argc, char *argv[]) {
     int server_socket_udp, server_socket_tcp;
-    int port_num = 58000 + GN;
+    int port_num = DEFAULT_PORT + GN;
     char port[6];
     snprintf(port, sizeof(port), "%d", port_num);
 
@@ -72,7 +57,7 @@ int main(int argc, char *argv[]) {
 
         // Processar UDP (no processo pai)
         if (FD_ISSET(server_socket_udp, &read_fds)) {
-            struct sockaddr_in client_addr;
+            struct sockaddr_in client_addr = {0};
             handle_udp_request(server_socket_udp, client_addr);
         }
 
@@ -93,7 +78,7 @@ int main(int argc, char *argv[]) {
             } else if (pid == 0) {
                 // Processo filho lida com este cliente TCP
                 close(server_socket_tcp); // O filho não precisa do socket de escuta
-                handle_tcp_request(client_socket);
+                handle_tcp_request(client_socket, client_addr);
                 exit(0); // Termina o processo filho
             } else {
                 // Processo pai
@@ -180,10 +165,7 @@ int setup_tcp_socket(const char *port) {
 void handle_udp_request(int sockfd, struct sockaddr_in client_addr) {
     char buffer[BUF_SIZE];
     socklen_t client_len = sizeof(client_addr);
-
-    printf("Processo pai a tratar cliente UDP %s:%d\n",
-           inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-
+    
     // Recebe mensagem do cliente
     int n = recvfrom(sockfd, buffer, BUF_SIZE, 0, (struct sockaddr *)&client_addr, &client_len);
     if (n < 0) {
@@ -192,8 +174,10 @@ void handle_udp_request(int sockfd, struct sockaddr_in client_addr) {
     }
 
     buffer[n] = '\0'; // Termina a string
-    printf("Recebido do cliente UDP: %s\n", buffer);
 
+    if (VERBOSE) {
+        printf("IP=%s, Port=%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+    }
     // Chama a função para interpretar a mensagem
     const char *response = interpret_player_request(buffer);
 
@@ -204,7 +188,7 @@ void handle_udp_request(int sockfd, struct sockaddr_in client_addr) {
 }
 
 
-void handle_tcp_request(int client_sockfd) {
+void handle_tcp_request(int client_sockfd, struct sockaddr_in client_addr) {
     char buffer[BUF_SIZE];
     int total_read = 0, total_written = 0, n;
 
@@ -230,8 +214,10 @@ void handle_tcp_request(int client_sockfd) {
     }
 
     buffer[total_read] = '\0'; // Garante que a string lida está terminada corretamente
-    printf("Recebido do cliente TCP: %s\n", buffer);
 
+    if (VERBOSE) {
+        printf("IP=%s, Port=%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+    }
     // Chama a função para interpretar a mensagem
     const char *response = interpret_player_request(buffer);
     
@@ -256,7 +242,7 @@ const char* interpret_player_request(const char *message) {
     
     // Extrai os primeiros 3 caracteres da mensagem
     if (sscanf(message, "%3s", command) != 1) {
-        return "ERR Comando inválido\n";
+        return "ERR\n";
     }
 
     // Compara o comando extraído
@@ -266,13 +252,16 @@ const char* interpret_player_request(const char *message) {
         return handle_try(message);
     } else if (strcmp(command, "STR") == 0) {
         return handle_show_trials(message);
-    } else if (strcmp(command, "SSB") == 0) {
+    } else if (strcmp(message, "SSB\n") == 0) {
         return handle_scoreboard();
     } else if (strcmp(command, "DBG") == 0) {
         return handle_debug(message);
     } else if (strcmp(command, "QUT") == 0) {
         return handle_quit(message);
     } else {
-        return "ERR Comando desconhecido\n";
+        if (VERBOSE) {
+            printf("Syntax error in command\n\n");
+        }
+        return "ERR\n";
     }
 }

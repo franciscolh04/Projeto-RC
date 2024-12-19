@@ -1,9 +1,11 @@
 #ifndef GAME_H
 #define GAME_H
 
+#include "./../common/verifications.h"
+
 // Definir as cores possíveis como constantes
 #define TOTAL_COLORS 6
-#define CODE_SIZE 4
+//#define CODE_SIZE 4
 #define MAX_PLAYS 8
 
 // Inicializa o array de cores diretamente no cabeçalho

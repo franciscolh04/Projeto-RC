@@ -4,8 +4,7 @@
 #include <time.h>
 #include <math.h>
 #include "game.h"
-
-#define BUF_SIZE 1024
+#include "./../common/verifications.h"
 
 #define FLAG_END 0
 #define FLAG_START 1

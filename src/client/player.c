@@ -6,29 +6,27 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <signal.h>
+#include "player.h"
 
-#define DEFAULT_PORT 58000
-#define GN 0
-#define BUF_SIZE 1024
-
-char PLID[7] = ""; // PLID definido como char com espaço para 6 caracteres + terminador nulo
+char PLID[7] = "";
 int MAX_PLAYTIME = 0;
 int NUM_TRIALS = 1;
 int EXIT = 0;
-
-// Funções para configurar os sockets e enviar mensagens
-void setup_udp_socket(int *sockfd, struct sockaddr_in *server_addr, char *server_ip, int port);
-void setup_tcp_socket(int *sockfd, struct sockaddr_in *server_addr, char *server_ip, int port);
-int send_udp_message(int sockfd, struct sockaddr_in *server_addr, char *message, char *response);
-int send_tcp_message(struct sockaddr_in *server_addr, char *server_ip, int port, char *message, char *response);
-
-// Função para processar o comando do utilizador
-void process_command(const char *input, char *formatted_command, char *protocol);
-
-// Função para interpretar a resposta do servidor
-void interpret_server_response(const char *response);
+int ONGOING_GAME = 0;
 
 int main(int argc, char *argv[]) {
+    // Configurar o manipulador de sinal SIGINT
+    struct sigaction sa;
+    sa.sa_handler = handle_sigint;
+    sa.sa_flags = 0; // Sem SA_RESTART
+    sigemptyset(&sa.sa_mask);
+    if (sigaction(SIGINT, &sa, NULL) == -1) {
+        perror("Erro ao configurar sigaction");
+        exit(EXIT_FAILURE);
+    }
+
+
     int port = DEFAULT_PORT + GN;
     int sock_fd_udp;
     struct sockaddr_in server_addr;
@@ -36,7 +34,7 @@ int main(int argc, char *argv[]) {
     char formatted_command[BUF_SIZE];
     char response[BUF_SIZE];
     char protocol;
-    char *server_ip = "127.0.0.1";  // IP do servidor (localhost por padrão)
+    char *server_ip = LOCALHOST;
     int opt;
 
     // Processar argumentos de linha de comando
@@ -61,8 +59,12 @@ int main(int argc, char *argv[]) {
 
     // Loop principal para interações contínuas
     while (!EXIT) {
-        printf("Digite um comando para enviar ao servidor (ou 'exit' para sair): ");
-        fgets(buffer, BUF_SIZE, stdin);
+        printf("Digite o comando a enviar para o servidor: ");
+        if (fgets(buffer, BUF_SIZE, stdin) == NULL) {
+            if (EXIT) break; // Verifica se SIGINT foi recebido durante o bloqueio de fgets
+            perror("Erro ao ler input");
+            continue;
+        }
         buffer[strcspn(buffer, "\n")] = 0;  // Remover a nova linha do final da string
 
         // Processar o comando e escolher o protocolo
@@ -75,7 +77,7 @@ int main(int argc, char *argv[]) {
         } else if (protocol == 'T') {
             success = send_tcp_message(&server_addr, server_ip, port, formatted_command, response);
         } else {
-            printf("Comando inválido ou protocolo não suportado.\n");
+            printf("Comando inválido.\n");
             continue;
         }
 
@@ -91,251 +93,160 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-
-int save_file(const char *response, const char *filename, int filesize) {
-    printf("A processar ficheiro '%s' (%d bytes)...\n", filename, filesize);
-
-    // Abre o ficheiro local para escrita
-    FILE *file = fopen(filename, "wb");
-    if (!file) {
-        perror("Erro ao abrir ficheiro para escrita");
-        return 0;
-    }
-
-    // Encontrar o início dos dados Fdata no buffer response
-    const char *file_data = response;
-
-    // Saltar o cabeçalho "RST status Fname Fsize"
-    for(int i = 0; i < 4; i++) {  
-        file_data = strchr(file_data, ' '); // Salta até acabar o cabeçalho
-        if (!file_data) { fclose(file); return 0; }
-    }
-    
-
-    // Avançar para além do espaço para chegar ao início de Fdata
-    file_data++;
-
-    // Escrever os dados no ficheiro
-    int bytes_written = 0;
-    while (bytes_written < filesize) {
-        int chunk_size = fwrite(file_data + bytes_written, 1, filesize - bytes_written, file);
-        if (chunk_size <= 0) {
-            perror("Erro ao escrever ficheiro");
-            fclose(file);
-            return 0;
-        }
-        bytes_written += chunk_size;
-    }
-
-    fclose(file);
-    printf("Ficheiro '%s' recebido e armazenado com sucesso!\n", filename);
-
-    return 1;
+void handle_sigint(int sig) {
+    (void)sig; // Evita o aviso de "unused parameter"
+    EXIT = 1;
 }
-
-
-// Configuração do socket UDP
-void setup_udp_socket(int *sockfd, struct sockaddr_in *server_addr, char *server_ip, int port) {
-    *sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (*sockfd < 0) {
-        perror("Erro ao criar socket UDP");
-        exit(EXIT_FAILURE);
-    }
-
-    memset(server_addr, 0, sizeof(*server_addr));
-    server_addr->sin_family = AF_INET;
-    server_addr->sin_port = htons(port);
-    if (inet_pton(AF_INET, server_ip, &server_addr->sin_addr) <= 0) {
-        perror("Erro ao configurar o endereço IP do servidor (UDP)");
-        exit(EXIT_FAILURE);
-    }
-}
-
-
-// Configuração de socket TCP
-void setup_tcp_socket(int *sockfd, struct sockaddr_in *server_addr, char *server_ip, int port) {
-    *sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (*sockfd < 0) {
-        perror("Erro ao criar socket TCP");
-        exit(EXIT_FAILURE);
-    }
-
-    memset(server_addr, 0, sizeof(*server_addr));
-    server_addr->sin_family = AF_INET;
-    server_addr->sin_port = htons(port);
-    if (inet_pton(AF_INET, server_ip, &server_addr->sin_addr) <= 0) {
-        perror("Erro ao configurar o endereço IP do servidor (TCP)");
-        close(*sockfd);
-        exit(EXIT_FAILURE);
-    }
-
-    if (connect(*sockfd, (struct sockaddr *)server_addr, sizeof(*server_addr)) < 0) {
-        perror("Erro ao conectar ao servidor (TCP)");
-        close(*sockfd);
-        exit(EXIT_FAILURE);
-    }
-}
-
-
-// Enviar mensagem UDP e retornar a resposta
-int send_udp_message(int sockfd, struct sockaddr_in *server_addr, char *message, char *response) {
-    if (sendto(sockfd, message, strlen(message), 0, (struct sockaddr *)server_addr, sizeof(*server_addr)) < 0) {
-        perror("Erro ao enviar mensagem para o servidor (UDP)");
-        return 0;
-    }
-
-    socklen_t server_len = sizeof(*server_addr);
-    int n = recvfrom(sockfd, response, BUF_SIZE, 0, (struct sockaddr *)server_addr, &server_len);
-    if (n < 0) {
-        perror("Erro ao receber resposta do servidor (UDP)");
-        return 0;
-    }
-
-    response[n] = '\0'; // Garante que a mensagem é uma string válida
-    return 1;
-}
-
-
-// Estabelecer conexão TCP, enviar mensagem, receber resposta e fechar conexão e retornar a resposta
-int send_tcp_message(struct sockaddr_in *server_addr, char *server_ip, int port, char *message, char *response) {
-    int sockfd;
-
-    // Configura e conecta o socket TCP
-    setup_tcp_socket(&sockfd, server_addr, server_ip, port);
-
-    // Envia a mensagem para o servidor
-    int total_written = 0, total_read = 0, n;
-    int bytes_to_write = strlen(message);
-
-    while (total_written < bytes_to_write) {
-        n = write(sockfd, message + total_written, bytes_to_write - total_written);
-        if (n < 0) {
-            perror("Erro ao enviar mensagem para o servidor (TCP)");
-            close(sockfd);
-            return 0;
-        }
-        total_written += n;
-    }
-
-    // Lê a resposta inicial do servidor
-    while (total_read < BUF_SIZE - 1) {
-        n = read(sockfd, response + total_read, BUF_SIZE - 1 - total_read);
-        if (n < 0) {
-            perror("Erro ao receber resposta do servidor (TCP)");
-            close(sockfd);
-            return 0;
-        }
-        if (n == 0) { // Conexão fechada pelo servidor
-            break;
-        }
-            total_read += n;
-    }
-
-    response[total_read] = '\0'; // Garante que a mensagem é uma string válida
-
-    // Fecha a conexão TCP após processar a resposta
-    close(sockfd);
-    return 1;
-}
-
 
 // Interpretar a resposta do servidor
 void interpret_server_response(const char *response) {
-    printf("Resposta do servidor: %s\n", response);
     char status[BUF_SIZE], filename[BUF_SIZE];
     char c1[2], c2[2], c3[2], c4[2];
+    char color_code[CODE_SIZE + 1];
     int filesize, nB, nW;
 
     // RSG
     if (sscanf(response, "RSG %s\n", status) == 1) {
-        if (strcmp(status, "OK") == 0) {
-            printf("New game started (max %d sec)\n", MAX_PLAYTIME);
+        if (strcmp(response, "RSG OK\n") == 0) {
+            printf("New game started (max %d sec)\n\n", MAX_PLAYTIME);
             NUM_TRIALS = 1;
-        } else if (strcmp(status, "NOK") == 0) {
-            printf("The player has an ongoing game\n");
-        } else if (strcmp(status, "ERR") == 0) {
-            printf("Invalid arguments for specified command.\nUsage: start PLID (6-digit IST ID) max_playtime (up to 600 sec)\n");
+            ONGOING_GAME = 1;
+        } else if (strcmp(response, "RSG NOK\n") == 0) {
+            printf("The player has an ongoing game\n\n");
+        } else if (strcmp(response, "RSG ERR\n") == 0) {
+            printf("Invalid arguments for specified command.\nUsage: start PLID (6-digit IST ID) max_playtime (up to 600 sec)\n\n");
+        } else {
+            printf("ERR\n\n");
         }
     // RTR
     } else if (sscanf(response, "RTR OK %d %d %d\n", &NUM_TRIALS, &nB, &nW) == 3) {
-        if (nB == 4) {
-            printf("WELL DONE! You guessed the key in %d trials\n", NUM_TRIALS);
+        if(strlen(response) != 13 || response[3] != ' ' || response[6] != ' ' || response[8] != ' ' ||
+           response[10] != ' ' || nB > 4 || nW > 4 || nB < 0 || nW < 0 || NUM_TRIALS > 8) {
+            printf("ERR\n\n");
+        } else if (nB == 4) {
+            printf("WELL DONE! You guessed the key in %d trials\n\n", NUM_TRIALS);
             NUM_TRIALS = 1;
+            ONGOING_GAME = 0;
         } else {
-            printf("nB = %d, nW = %d\n", nB, nW);
+            printf("nB = %d, nW = %d\n\n", nB, nW);
             NUM_TRIALS++;
         }
     } else if (sscanf(response, "RTR ENT %1s %1s %1s %1s\n", c1, c2, c3, c4) == 4) {
-        printf("No more attempts available. The secret key was %s %s %s %s\n", c1, c2, c3, c4);
-        NUM_TRIALS = 1;
+        snprintf(color_code, sizeof(color_code), "%s%s%s%s", c1, c2, c3, c4);
+        if (strlen(response) != 16 || response[3] != ' ' || response[7] != ' ' || response[9] != ' ' || response[11] != ' ' || response[13] != ' ' || !valid_colors(color_code)) {
+            printf("ERR\n\n");
+        }  else {
+            printf("No more attempts available. The secret key was %s %s %s %s\n\n", c1, c2, c3, c4);
+            NUM_TRIALS = 1;
+            ONGOING_GAME = 0;
+        }
     } else if (sscanf(response, "RTR ETM %1s %1s %1s %1s\n", c1, c2, c3, c4) == 4) {
-        printf("Time is up. The secret key was %s %s %s %s\n", c1, c2, c3, c4);
-        NUM_TRIALS = 1;
+        snprintf(color_code, sizeof(color_code), "%s%s%s%s", c1, c2, c3, c4);
+        if (strlen(response) != 16 || response[3] != ' ' || response[7] != ' ' || response[9] != ' ' || response[11] != ' ' || response[13] != ' ' || !valid_colors(color_code)) {
+            printf("ERR\n\n");
+        } else {
+            printf("Time is up. The secret key was %s %s %s %s\n\n", c1, c2, c3, c4);
+            NUM_TRIALS = 1;
+            ONGOING_GAME = 0;
+        }
     } else if (sscanf(response, "RTR %s\n", status) == 1) {
-        if (strcmp(status, "DUP") == 0) {
-            printf("Duplicate guess: The secret key you provided matches a previous trial\n");
-        } else if (strcmp(status, "INV") == 0) {
-            printf("Invalid trial: The trial number is either not the expected value or does not match the previous guess for the current trial number\n");
-        } else if (strcmp(status, "NOK") == 0) {
-            printf("To make a guess you have to start a game first. Use: start PLID max_playtime\n");
-        } else if (strcmp(status, "ERR") == 0) {
-            printf("Invalid arguments for specified command.\n Usage: try c1 c2 c3 c4 (ci pertence {R, G, B, Y, O, P})\n");
+        if (strcmp(response, "RTR DUP\n") == 0) {
+            printf("Duplicate guess: The secret key you provided matches a previous trial\n\n");
+        } else if (strcmp(response, "RTR INV\n") == 0) {
+            printf("Invalid trial: The trial number is either not the expected value or does not match the previous guess for the current trial number\n\n");
+        } else if (strcmp(response, "RTR NOK\n") == 0) {
+            printf("To make a guess you have to start a game first. Use: start PLID max_playtime\n\n");
+        } else if (strcmp(response, "RTR ERR\n") == 0) {
+            printf("Invalid arguments for specified command.\n Usage: try c1 c2 c3 c4 (ci pertence {R, G, B, Y, O, P})\n\n");
+        } else {
+            printf("ERR\n\n");
         }
     // RQT
     } else if (sscanf(response, "RQT OK %1s %1s %1s %1s\n", c1, c2, c3, c4) == 4) {
-        printf("The ongoing game has been terminated. The secret key was %s %s %s %s\n", c1, c2, c3, c4);
+        snprintf(color_code, sizeof(color_code), "%s%s%s%s", c1, c2, c3, c4);
+        if (strlen(response) != 15 || response[3] != ' ' || response[6] != ' ' || response[8] != ' ' || response[10] != ' ' || response[12] != ' ' || !valid_colors(color_code)) {
+            printf("ERR\n\n");
+        } else {
+            printf("The ongoing game has been terminated. The secret key was %s %s %s %s\n\n", c1, c2, c3, c4);
+            ONGOING_GAME = 0;
+        }
     } else if (sscanf(response, "RQT %s\n", status) == 1) {
-        if (strcmp(status, "NOK") == 0) {
-            printf("No ongoing game: The player does not have an active game to quit\n");
-        } else if (strcmp(status, "ERR") == 0) {
-            printf("The quit request could not be processed.\n");
+        if (strcmp(response, "RQT NOK\n") == 0) {
+            printf("No ongoing game: The player does not have an active game to quit\n\n");
+        } else if (strcmp(response, "RQT ERR") == 0) {
+            printf("The quit request could not be processed.\n\n");
         }
     // RDB
-    } else if (sscanf(response, "RDB %s", status) == 1) {
-        if (strcmp(status, "OK") == 0) {
-            printf("New game started (max %d sec)\n", MAX_PLAYTIME);
+    } else if (sscanf(response, "RDB %s\n", status) == 1) {
+        if (strcmp(response, "RDB OK\n") == 0) {
+            printf("New game started (max %d sec)\n\n", MAX_PLAYTIME);
             NUM_TRIALS = 1;
-        } else if (strcmp(status, "NOK") == 0) {
-            printf("The player has an ongoing game\n");
-        } else if (strcmp(status, "ERR") == 0) {
-            printf("Invalid arguments for specified command.\nUsage: debug PLID (6-digit IST ID) max_playtime (up to 600 sec) c1 c2 c3 c4\n");
+        } else if (strcmp(response, "RDB NOK\n") == 0) {
+            printf("The player has an ongoing game\n\n");
+        } else if (strcmp(response, "RDB ERR\n") == 0) {
+            printf("Invalid arguments for specified command.\nUsage: debug PLID (6-digit IST ID) max_playtime (up to 600 sec) c1 c2 c3 c4\n\n");
+        } else {
+            printf("ERRgay\n\n");
         }
     // RST
     } else if (sscanf(response, "RST %s %s %d", status, filename, &filesize) >= 1) {
-        if (strcmp(status, "ACT") == 0 || strcmp(status, "FIN") == 0) {
+        if(response[3] != ' ' || response[7] != ' ' || response[8 + strlen(filename)] != ' ' || response[strlen(response) - 1] != '\n') {
+            printf("ERR\n\n");
+        } else if (strcmp(status, "ACT") == 0 || strcmp(status, "FIN") == 0) {
             if (!save_file(response, filename, filesize)) {
-                printf("Erro ao guardar o ficheiro '%s'.\n", filename);
+                printf("Erro ao guardar o ficheiro '%s'.\n\n", filename);
             }
         } else if (strcmp(status, "NOK") == 0) {
-            printf("Nenhum jogo ativo ou terminado encontrado para este jogador.\n");
+            printf("Nenhum jogo ativo ou terminado encontrado para este jogador.\n\n");
         }
     // RSS
     } else if (sscanf(response, "RSS %s %s %d", status, filename, &filesize) >= 1) {
-        if (strcmp(status, "EMPTY") == 0) {
-            printf("Scoreboard vazia. Ainda não foi ganho nenhum jogo.\n");
+        if(response[3] != ' ' || response[4 + strlen(status)] != ' ' || response[5 + strlen(status) + strlen(filename)] != ' ' || response[strlen(response) - 1] != '\n') {
+            printf("ERR\n\n");
+        } else if (strcmp(status, "EMPTY") == 0) {
+            printf("Scoreboard vazia. Ainda não foi ganho nenhum jogo.\n\n");
         } else if (strcmp(status, "OK") == 0) {
             if (!save_file(response, filename, filesize)) {
-                printf("Erro ao guardar o ficheiro '%s'.\n", filename);
+                printf("Erro ao guardar o ficheiro '%s'.\n\n", filename);
             }
         }
     // ERR
     } else {
-        printf("ERR\n");
+        printf("ERR\n\n");
     }
 }
 
 void process_command(const char *input, char *formatted_command, char *protocol) {
     char c1[2], c2[2], c3[2], c4[2];
+    char color_code[CODE_SIZE + 1];
+    int num_dig = 0;
+    char plid[7];
+    strcpy(plid, PLID);
 
     // Análise do comando e definição do protocolo
     if (sscanf(input, "start %6s %d", PLID, &MAX_PLAYTIME) == 2) {
-        snprintf(formatted_command, BUF_SIZE, "SNG %s %d\n", PLID, MAX_PLAYTIME);
-        *protocol = 'U';  // UDP para o comando "start"
+        if (ONGOING_GAME && strcmp(PLID, plid) != 0) {
+            strcpy(PLID, plid);
+            *protocol = 'X';  // X indica um comando inválido
+            return;
+        }
+        num_dig = count_digits(MAX_PLAYTIME);
+        if (strlen(input) != (13 + num_dig) || input[5] != ' ' || input[12] != ' ' || atoi(PLID) < 100000 || MAX_PLAYTIME < 0 || MAX_PLAYTIME > 600) {
+            *protocol = 'X';  // X indica um comando inválido
+        } else {
+            snprintf(formatted_command, BUF_SIZE, "SNG %s %3d\n", PLID, MAX_PLAYTIME);
+            *protocol = 'U';  // UDP para o comando "start"
+        }
     } 
     // Adicionar outras condições conforme os outros comandos
     else if (sscanf(input, "try %1s %1s %1s %1s", c1, c2, c3, c4) == 4) {
-        snprintf(formatted_command, BUF_SIZE, "TRY %s %s %s %s %s %d\n", PLID, c1, c2, c3, c4, NUM_TRIALS);
-        *protocol = 'U';  // UDP para o comando "try"
+        snprintf(color_code, sizeof(color_code), "%s%s%s%s", c1, c2, c3, c4);
+        if (!valid_colors(color_code) || strlen(input) != 11 || input[3] != ' '|| input[5] != ' '||input[7] != ' ' || input[9] != ' ' || input[11] != '\0') {
+            *protocol = 'X';  // X indica um comando inválido
+        } else {
+            snprintf(formatted_command, BUF_SIZE, "TRY %s %s %s %s %s %d\n", PLID, c1, c2, c3, c4, NUM_TRIALS);
+            *protocol = 'U';  // UDP para o comando "try"
+        }
     }
     else if (strcmp(input, "show_trials") == 0 || strcmp(input, "st") == 0) {
         snprintf(formatted_command, BUF_SIZE, "STR %s\n", PLID);
@@ -359,8 +270,21 @@ void process_command(const char *input, char *formatted_command, char *protocol)
         EXIT = 1;
     }
     else if (sscanf(input, "debug %6s %d %1s %1s %1s %1s", PLID, &MAX_PLAYTIME, c1, c2, c3, c4) == 6) {
-        snprintf(formatted_command, BUF_SIZE, "DBG %s %d %s %s %s %s\n", PLID, MAX_PLAYTIME, c1, c2, c3, c4);
-        *protocol = 'U';  // UDP para o comando "debug"
+        if (ONGOING_GAME) {
+            strcpy(PLID, plid);
+            *protocol = 'X';  // X indica um comando inválido
+            return;
+        }
+        num_dig = count_digits(MAX_PLAYTIME);
+        snprintf(color_code, sizeof(color_code), "%s%s%s%s", c1, c2, c3, c4);
+        if (!valid_colors(color_code) || strlen(input) != (21 + num_dig) || input[5] != ' ' || input[12] != ' ' ||
+            input[13 + num_dig] != ' ' || input[15 + num_dig] != ' ' || input[17 + num_dig] != ' ' || input[19 + num_dig] != ' ' ||
+            input[21 + num_dig] != '\0' || atoi(PLID) < 100000 || MAX_PLAYTIME < 0 || MAX_PLAYTIME > 600) {
+            *protocol = 'X';  // X indica um comando inválido
+        } else {
+            snprintf(formatted_command, BUF_SIZE, "DBG %s %d %s %s %s %s\n", PLID, MAX_PLAYTIME, c1, c2, c3, c4);
+            *protocol = 'U';  // UDP para o comando "debug"
+        }
     }
     else {
         *protocol = 'X';  // X indica um comando não reconhecido

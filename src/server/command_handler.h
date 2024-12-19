@@ -2,6 +2,11 @@
 #ifndef COMMAND_HANDLER_H
 #define COMMAND_HANDLER_H
 
+#include "state.h"
+#include "game.h"
+#include "GS.h"
+#include "./../common/verifications.h"
+
 // Funções para tratar os comandos
 const char* handle_start(const char* request);
 const char* handle_try(const char* request);

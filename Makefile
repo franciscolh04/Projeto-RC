@@ -10,7 +10,7 @@ COMMON_SRC = src/common
 SERVER_OBJS = $(SERVER_SRC)/command_handler.o $(SERVER_SRC)/game.o $(SERVER_SRC)/state.o $(SERVER_SRC)/GS.o
 
 # Ficheiro do cliente
-PLAYER_OBJS = $(CLIENT_SRC)/player.o
+PLAYER_OBJS = $(CLIENT_SRC)/player.o $(CLIENT_SRC)/communication.o
 
 # Ficheiro do common
 COMMON_OBJS = $(COMMON_SRC)/verifications.o
@@ -48,6 +48,10 @@ $(COMMON_SRC)/verifications.o: $(COMMON_SRC)/verifications.c $(COMMON_SRC)/verif
 
 $(CLIENT_SRC)/player.o: $(CLIENT_SRC)/player.c
 	$(CC) $(CFLAGS) -c $(CLIENT_SRC)/player.c -o $(CLIENT_SRC)/player.o
+
+
+$(CLIENT_SRC)/communication.o: $(CLIENT_SRC)/communication.c
+	$(CC) $(CFLAGS) -c $(CLIENT_SRC)/communication.c -o $(CLIENT_SRC)/communication.o
 
 # Limpeza dos arquivos gerados
 clean:

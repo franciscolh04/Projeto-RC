@@ -1,5 +1,4 @@
 #include "state.h"
-#include "game.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -27,7 +26,7 @@ int has_active_game(char *plid, int flag) {
     int line_count = 0;
 
     // Conta o número de linhas no ficheiro
-    for (int i = 0; fgets(buffer, sizeof(buffer), file); i++) {
+    while(fgets(buffer, sizeof(buffer), file)) {
         line_count++;
     }
 
@@ -113,8 +112,9 @@ int check_trial(char *plid, const char *attempt) {
 
 int get_last_trial(char *plid, int *nT, int *nB, int *nW) {
     char filename[64];
-    snprintf(filename, sizeof(filename), "%sGAME_%s.txt", GAMES_DIR, plid);
 
+    snprintf(filename, sizeof(filename), "%sGAME_%s.txt", GAMES_DIR, plid);
+   
     FILE *file = fopen(filename, "r");
     if (!file) {
         perror("Erro ao abrir o ficheiro do jogo");
@@ -472,7 +472,6 @@ void format_show_trials(const char *plid, const char *fname, char *buffer, int g
     if (game_status == ACTIVE_GAME) {
         time(&now); // Obtém o tempo atual.
         int remaining_time = max_time - (int)difftime(now, start_time);
-        printf("remaining_time: %d\n", remaining_time);
         if (remaining_time < 0) {
             remaining_time = 0; // Evita valores negativos.
         }

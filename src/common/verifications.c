@@ -18,3 +18,15 @@ int valid_colors( char *color_code) {
     }
     return 1; // Retorna 1 se todas forem válidas
 }
+
+int count_digits(int num) {
+    if (num == 0) { 
+        return 1;
+    }
+    int count = 0;
+    while (num > 0) {
+        num /= 10; // Remove o último dígito
+        count++;
+    }
+    return count;
+}

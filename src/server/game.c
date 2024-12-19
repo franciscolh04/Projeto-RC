@@ -3,6 +3,7 @@
 #include <time.h>
 #include <string.h>
 
+
 // R = Red, G = Green, B = Blue, Y = Yellow, O = Orange, P = Purple
 const char* colors[] = { "R", "G", "B", "Y", "O", "P" };
 
