@@ -201,10 +201,10 @@ void interpret_server_response(const char *response) {
         }
     // RSS
     } else if (sscanf(response, "RSS %s %s %d", status, filename, &filesize) >= 1) {
-        if(response[3] != ' ' || response[4 + strlen(status)] != ' ' || response[5 + strlen(status) + strlen(filename)] != ' ' || response[strlen(response) - 1] != '\n') {
-            printf("ERR\n\n");
-        } else if (strcmp(status, "EMPTY") == 0) {
+        if (strcmp(status, "EMPTY") == 0) {
             printf("Scoreboard vazia. Ainda não foi ganho nenhum jogo.\n\n");
+        } else if (response[3] != ' ' || response[4 + strlen(status)] != ' ' || response[5 + strlen(status) + strlen(filename)] != ' ' || response[strlen(response) - 1] != '\n') {
+            printf("ERR\n\n");
         } else if (strcmp(status, "OK") == 0) {
             if (!save_file(response, filename, filesize)) {
                 printf("Erro ao guardar o ficheiro '%s'.\n\n", filename);
