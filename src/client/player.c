@@ -103,7 +103,7 @@ void interpret_server_response(const char *response) {
     char status[BUF_SIZE], filename[BUF_SIZE];
     char c1[2], c2[2], c3[2], c4[2];
     char color_code[CODE_SIZE + 1];
-    int filesize, nB, nW;
+    int filesize, nB, nW, num_trials_sv;
 
     // RSG
     if (sscanf(response, "RSG %s\n", status) == 1) {
@@ -119,9 +119,9 @@ void interpret_server_response(const char *response) {
             printf("ERR\n\n");
         }
     // RTR
-    } else if (sscanf(response, "RTR OK %d %d %d\n", &NUM_TRIALS, &nB, &nW) == 3) {
+    } else if (sscanf(response, "RTR OK %d %d %d\n", &num_trials_sv, &nB, &nW) == 3) {
         if(strlen(response) != 13 || response[3] != ' ' || response[6] != ' ' || response[8] != ' ' ||
-           response[10] != ' ' || nB > 4 || nW > 4 || nB < 0 || nW < 0 || NUM_TRIALS > 8) {
+           response[10] != ' ' || nB > 4 || nW > 4 || nB < 0 || nW < 0 || num_trials_sv > 8 || num_trials_sv != NUM_TRIALS) {
             printf("ERR\n\n");
         } else if (nB == 4) {
             printf("WELL DONE! You guessed the key in %d trials\n\n", NUM_TRIALS);
@@ -234,7 +234,7 @@ void process_command(const char *input, char *formatted_command, char *protocol)
         if (strlen(input) != (13 + num_dig) || input[5] != ' ' || input[12] != ' ' || atoi(PLID) < 100000 || MAX_PLAYTIME < 0 || MAX_PLAYTIME > 600) {
             *protocol = 'X';  // X indica um comando inválido
         } else {
-            snprintf(formatted_command, BUF_SIZE, "SNG %s %3d\n", PLID, MAX_PLAYTIME);
+            snprintf(formatted_command, BUF_SIZE, "SNG %s %03d\n", PLID, MAX_PLAYTIME);
             *protocol = 'U';  // UDP para o comando "start"
         }
     } 

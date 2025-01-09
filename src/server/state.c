@@ -432,6 +432,7 @@ int FindTopScores(SCORELIST *list) {
 
 
 // Função para formatar buffer com dados do jogo para o comando show_trials
+/*
 void format_show_trials(const char *plid, const char *fname, char *buffer, int game_status) {
     FILE *file = fopen(fname, "r");
     if (!file) {
@@ -482,8 +483,8 @@ void format_show_trials(const char *plid, const char *fname, char *buffer, int g
 
     fclose(file);
 }
+*/
 
-/*
 void format_show_trials(const char *plid, const char *fname, char *buffer, int game_status) {
     FILE *file = fopen(fname, "r");
     if (!file) {
@@ -570,9 +571,10 @@ void format_show_trials(const char *plid, const char *fname, char *buffer, int g
 
     fclose(file);
 }
-*/
+
 
 // Função para formatar o buffer para a scoreboard
+/*
 void format_scoreboard(SCORELIST *list, char *buffer) {
     buffer[0] = '\0'; // Inicializar o buffer como vazio.
 
@@ -589,8 +591,8 @@ void format_scoreboard(SCORELIST *list, char *buffer) {
         strcat(buffer, line); // Adicionar a linha ao buffer principal.
     }
 }
+*/
 
-/*
 void format_scoreboard(SCORELIST *list, char *buffer) {
     // Formatar o cabeçalho com o número correto de scores
     snprintf(buffer, 128, 
@@ -614,7 +616,4 @@ void format_scoreboard(SCORELIST *list, char *buffer) {
         strcat(buffer, line); // Adicionar a linha ao buffer principal
     }   
 }
-*/
-
-
 
